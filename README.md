@@ -52,9 +52,9 @@ To run this project locally:
 
 You can preview the application using Expo Snack:
 
-[![Expo Snack]](https://snack.expo.dev/@git/github.com/Loaytamer/Learning-Management-System?platform=android)
+[Expo Snack](https://snack.expo.dev/@git/github.com/Loaytamer/Learning-Management-System?platform=android)
 
 ### Figma Design
 You can preview the application UI using Figma:
 
-[![Figma prototype]](https://www.figma.com/design/j4LMiXviXJ6fOsZ6gYpmra/Untitled?node-id=0-1&t=gXJsR6L9z1ran4bB-1)
+[Figma prototype](https://www.figma.com/design/j4LMiXviXJ6fOsZ6gYpmra/Untitled?node-id=0-1&t=gXJsR6L9z1ran4bB-1)
