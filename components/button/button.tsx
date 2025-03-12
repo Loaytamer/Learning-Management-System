@@ -6,7 +6,7 @@ import {
   View,
 } from "react-native";
 import React from "react";
-import { commonStyles } from "@/styles/common/common.styles";
+import { commonStyles } from "../../styles/common/common.styles";
 
 export default function Button({
   title,
