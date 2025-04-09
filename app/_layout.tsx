@@ -2,10 +2,12 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { View } from 'react-native';
+import OnBoarding from './(routes)/onboarding';
+import { Stack } from 'expo-router';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -41,11 +43,23 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-
+const [isLoggedIn, setisLoggedIn] = useState(false);
 
   return (
-      <View>
 
-      </View>
+      <>
+        {isLoggedIn ? (
+          //go to 
+          <View>
+
+          </View>
+        ) : (
+          //else go to onboarding screen
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index"></Stack.Screen>
+            <Stack.Screen name="(routes)/welcome-intro/index"></Stack.Screen>
+          </Stack>
+        )}
+      </>
   );
 }
