@@ -1,18 +1,79 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { Link } from 'expo-router';
-import { useState } from 'react';
-import { responsiveHeight, responsiveWidth } from 'react-native-responsive-dimensions';
-import { LinearGradient } from 'expo-linear-gradient';
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { Link } from "expo-router";
+import { useState } from "react";
+import {
+  responsiveHeight,
+  responsiveWidth,
+} from "react-native-responsive-dimensions";
+import { LinearGradient } from "expo-linear-gradient";
+import CustomTextInput from "../../components/CustomTextInput";
 
 export default function Signup() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [nameError, setNameError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string) => {
+    return password.length >= 6;
+  };
+
+  const validateName = (name: string) => {
+    return name.length >= 2;
+  };
 
   const handleSignup = () => {
-    console.log('Signup attempt with:', { name, email, password });
+    let isValid = true;
+
+    // Validate name
+    if (!validateName(name)) {
+      setNameError("Name must be at least 2 characters long");
+      isValid = false;
+    } else {
+      setNameError("");
+    }
+
+    // Validate email
+    if (!validateEmail(email)) {
+      setEmailError("Please enter a valid email address");
+      isValid = false;
+    } else {
+      setEmailError("");
+    }
+
+    // Validate password
+    if (!validatePassword(password)) {
+      setPasswordError("Password must be at least 6 characters long");
+      isValid = false;
+    } else {
+      setPasswordError("");
+    }
+
+    // Validate confirm password
+    if (password !== confirmPassword) {
+      setConfirmPasswordError("Passwords do not match");
+      isValid = false;
+    } else {
+      setConfirmPasswordError("");
+    }
+
+    if (!isValid) {
+      Alert.alert("Validation Error", "Please check your inputs and try again");
+      return;
+    }
+
+    console.log("Signup attempt with:", { name, email, password });
   };
 
   return (
@@ -22,52 +83,48 @@ export default function Signup() {
     >
       <View style={styles.container}>
         <Text style={styles.title}>Create Account</Text>
-        
+
         <View style={styles.inputContainer}>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.label}>Full Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your full name"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-            />
-          </View>
+          <CustomTextInput
+            label="Full Name"
+            placeholder="Enter your full name"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+            isValid={!nameError}
+            errorMessage={nameError}
+          />
 
-          <View style={styles.inputWrapper}>
-            <Text style={styles.label}>Email Address</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-          
-          <View style={styles.inputWrapper}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-          </View>
+          <CustomTextInput
+            label="Email Address"
+            placeholder="Enter your email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            isValid={!emailError}
+            errorMessage={emailError}
+          />
 
-          <View style={styles.inputWrapper}>
-            <Text style={styles.label}>Confirm Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Re-enter your password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-            />
-          </View>
+          <CustomTextInput
+            label="Password"
+            placeholder="Enter your password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            isValid={!passwordError}
+            errorMessage={passwordError}
+          />
+
+          <CustomTextInput
+            label="Confirm Password"
+            placeholder="Re-enter your password"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            isValid={!confirmPasswordError}
+            errorMessage={confirmPasswordError}
+          />
         </View>
 
         <TouchableOpacity onPress={handleSignup} style={styles.button}>
@@ -90,55 +147,38 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: responsiveWidth(5),
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: responsiveHeight(4),
-    textAlign: 'center',
-    color: '#000',
+    textAlign: "center",
+    color: "#000",
   },
   inputContainer: {
     gap: responsiveHeight(2),
     marginBottom: responsiveHeight(3),
   },
-  inputWrapper: {
-    gap: responsiveHeight(1),
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginLeft: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    padding: responsiveHeight(1.5),
-    borderRadius: 8,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
   button: {
-    backgroundColor: '#3860be',
+    backgroundColor: "#3860be",
     padding: responsiveHeight(1.8),
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   links: {
     marginTop: responsiveHeight(3),
     gap: responsiveHeight(1),
-    alignItems: 'center',
+    alignItems: "center",
   },
   link: {
-    color: '#3860be',
+    color: "#3860be",
     fontSize: 14,
   },
-}); 
+});
