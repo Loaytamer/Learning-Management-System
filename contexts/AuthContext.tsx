@@ -1,10 +1,16 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { router } from 'expo-router';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { auth, database, ref, set, get } from '../config/firebase';
 import { User, Role } from '../data/users';
-import { auth } from '../config/firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  updateProfile as updateFirebaseProfile,
+  User as FirebaseUser
+} from 'firebase/auth';
 
+// Define the AuthContextProps interface
 interface AuthContextProps {
   user: User | null;
   isAuthenticated: boolean;
@@ -33,17 +39,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Check for authenticated user on startup and listen for auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       try {
         if (firebaseUser) {
           // User is signed in
-          const userDataString = await AsyncStorage.getItem(`user_${firebaseUser.uid}`);
+          const userRef = ref(database, `users/${firebaseUser.uid}`);
+          const snapshot = await get(userRef);
           let userData: User | null = null;
-          
-          if (userDataString) {
-            userData = JSON.parse(userDataString);
+
+          if (snapshot.exists()) {
+            userData = snapshot.val();
           } else {
-            // Create basic user object if not in AsyncStorage yet
+            // Create basic user object if not in database yet
             userData = {
               id: firebaseUser.uid,
               email: firebaseUser.email || '',
@@ -53,12 +60,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               avatar: null,
               bio: '',
               enrolledCourses: [],
-              lastLogin: new Date()
+              lastLogin: new Date(),
             };
-            // Save the new user data
-            await AsyncStorage.setItem(`user_${firebaseUser.uid}`, JSON.stringify(userData));
+            // Save the new user data to Firebase
+            await set(userRef, userData);
           }
-          
+
+          // Also store in AsyncStorage for offline access
+          await AsyncStorage.setItem(`user_${firebaseUser.uid}`, JSON.stringify(userData));
           setUser(userData);
         } else {
           // User is signed out
@@ -79,31 +88,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
-      
+
       // Update last login time
-      const userDataString = await AsyncStorage.getItem(`user_${firebaseUser.uid}`);
-      if (userDataString) {
-        const userData = JSON.parse(userDataString);
+      const userRef = ref(database, `users/${firebaseUser.uid}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        const userData = snapshot.val();
         userData.lastLogin = new Date();
+        await set(userRef, userData);
+        // Also update AsyncStorage
         await AsyncStorage.setItem(`user_${firebaseUser.uid}`, JSON.stringify(userData));
       }
-      
+
       return true;
     } catch (error) {
       console.error('Login error:', error);
       return false;
     }
   };
-  
+
   const signup = async (email: string, password: string, name: string, role: Role): Promise<boolean> => {
     try {
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
-      
+
       // Update profile with display name
-      await updateProfile(firebaseUser, { displayName: name });
-      
+      await updateFirebaseProfile(firebaseUser, { displayName: name });
+
       // Create user data object
       const userData: User = {
         id: firebaseUser.uid,
@@ -114,17 +126,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         avatar: null,
         bio: '',
         enrolledCourses: [],
-        lastLogin: new Date()
+        lastLogin: new Date(),
       };
-      
+
       // If user is instructor, add empty createdCourses array
       if (role === 'instructor') {
         userData.createdCourses = [];
       }
-      
-      // Store user data in AsyncStorage
+
+      // Store user data in Firebase
+      const userRef = ref(database, `users/${firebaseUser.uid}`);
+      await set(userRef, userData);
+
+      // Also store in AsyncStorage for offline access
       await AsyncStorage.setItem(`user_${firebaseUser.uid}`, JSON.stringify(userData));
-      
+
       return true;
     } catch (error) {
       console.error('Signup error:', error);
@@ -134,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      await auth.signOut();
       setUser(null);
       router.replace('/login');
     } catch (error) {
@@ -147,13 +163,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const updatedUser = { ...user, ...userData };
         setUser(updatedUser);
-        
+
         // Update display name in Firebase if it changed
         if (userData.name && auth.currentUser) {
-          await updateProfile(auth.currentUser, { displayName: userData.name });
+          await updateFirebaseProfile(auth.currentUser, { displayName: userData.name });
         }
-        
-        // Store updated user data in AsyncStorage
+
+        // Store updated user data in Firebase
+        const userRef = ref(database, `users/${user.id}`);
+        await set(userRef, updatedUser);
+
+        // Also update AsyncStorage for offline access
         await AsyncStorage.setItem(`user_${user.id}`, JSON.stringify(updatedUser));
       } catch (error) {
         console.error('Update user error:', error);
