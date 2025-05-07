@@ -3,9 +3,11 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, KeyboardAvo
 import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Eye, EyeOff, UserPlus } from 'lucide-react-native';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { signup } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,16 +29,21 @@ export default function SignupScreen() {
       return;
     }
 
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+
     setError('');
     setIsSubmitting(true);
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, this would create a new user
-      // For this demo, we'll just redirect to login
-      router.replace('/login');
+      const success = await signup(email, password, name, role);
+      if (success) {
+        router.replace('/login');
+      } else {
+        setError('Failed to create account. Email may already be in use.');
+      }
     } catch (err) {
       setError('An error occurred. Please try again.');
       console.error(err);

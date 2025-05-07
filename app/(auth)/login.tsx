@@ -28,7 +28,7 @@ export default function LoginScreen() {
       if (success) {
         router.replace('/');
       } else {
-        setError('Invalid email or password. Try using student1@example.com / 123456 or instructor1@example.com / 123456');
+        setError('Invalid email or password. Please check your credentials and try again.');
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
