@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 import MOCK_COURSES, { Course, Lesson } from '../data/courses';
 import { useAuth } from './AuthContext';
+import * as Notifications from 'expo-notifications';
 
 interface CourseProgress {
   courseId: string;
@@ -17,7 +18,17 @@ interface CourseContextProps {
   getCourse: (id: string) => Course | undefined;
   enrollInCourse: (courseId: string) => boolean;
   unenrollFromCourse: (courseId: string) => boolean;
-  createCourse: (course: Omit<Course, 'id' | 'instructor' | 'instructorName' | 'enrolledStudents' | 'createdAt' | 'updatedAt'>) => Course;
+  createCourse: (
+    course: Omit<
+      Course,
+      | 'id'
+      | 'instructor'
+      | 'instructorName'
+      | 'enrolledStudents'
+      | 'createdAt'
+      | 'updatedAt'
+    >
+  ) => Course;
   updateCourse: (courseId: string, courseData: Partial<Course>) => boolean;
   deleteCourse: (courseId: string) => boolean;
   addLesson: (courseId: string, lesson: Omit<Lesson, 'id'>) => boolean;
@@ -43,28 +54,33 @@ const CourseContext = createContext<CourseContextProps>({
 
 export const useCourses = () => useContext(CourseContext);
 
-export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { user, updateUser } = useAuth();
   const [courses, setCourses] = useState<Course[]>(MOCK_COURSES);
-  const [courseProgress, setCourseProgress] = useState<Record<string, CourseProgress>>({});
+  const [courseProgress, setCourseProgress] = useState<
+    Record<string, CourseProgress>
+  >({});
 
   // Filter courses for the current user
-  const enrolledCourses = user 
-    ? courses.filter(course => course.enrolledStudents.includes(user.id))
+  const enrolledCourses = user
+    ? courses.filter((course) => course.enrolledStudents.includes(user.id))
     : [];
 
-  const instructorCourses = user?.role === 'instructor'
-    ? courses.filter(course => course.instructor === user.id)
-    : [];
+  const instructorCourses =
+    user?.role === 'instructor'
+      ? courses.filter((course) => course.instructor === user.id)
+      : [];
 
   const getCourse = (id: string): Course | undefined => {
-    return courses.find(course => course.id === id);
+    return courses.find((course) => course.id === id);
   };
 
-  const enrollInCourse = (courseId: string): boolean => {
+  const enrollInCourse = async (courseId: string): Promise<boolean> => {
     if (!user) return false;
 
-    const courseIndex = courses.findIndex(c => c.id === courseId);
+    const courseIndex = courses.findIndex((c) => c.id === courseId);
     if (courseIndex === -1) return false;
 
     // Check if already enrolled
@@ -76,7 +92,10 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedCourses = [...courses];
     updatedCourses[courseIndex] = {
       ...updatedCourses[courseIndex],
-      enrolledStudents: [...updatedCourses[courseIndex].enrolledStudents, user.id],
+      enrolledStudents: [
+        ...updatedCourses[courseIndex].enrolledStudents,
+        user.id,
+      ],
     };
     setCourses(updatedCourses);
 
@@ -88,7 +107,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // Initialize course progress
-    setCourseProgress(prev => ({
+    setCourseProgress((prev) => ({
       ...prev,
       [courseId]: {
         courseId,
@@ -98,13 +117,27 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       },
     }));
 
+    // Send push notification
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Course Enrollment Successful!',
+          body: `You have successfully enrolled in ${updatedCourses[courseIndex].title}. Start learning now!`,
+          data: { courseId },
+        },
+        trigger: null, // Show immediately
+      });
+    } catch (error) {
+      console.error('Error sending push notification:', error);
+    }
+
     return true;
   };
 
   const unenrollFromCourse = (courseId: string): boolean => {
     if (!user) return false;
 
-    const courseIndex = courses.findIndex(c => c.id === courseId);
+    const courseIndex = courses.findIndex((c) => c.id === courseId);
     if (courseIndex === -1) return false;
 
     // Update the course's enrolled students
@@ -112,7 +145,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updatedCourses[courseIndex] = {
       ...updatedCourses[courseIndex],
       enrolledStudents: updatedCourses[courseIndex].enrolledStudents.filter(
-        id => id !== user.id
+        (id) => id !== user.id
       ),
     };
     setCourses(updatedCourses);
@@ -120,14 +153,24 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Update user's enrolled courses
     if (user) {
       updateUser({
-        enrolledCourses: user.enrolledCourses.filter(id => id !== courseId),
+        enrolledCourses: user.enrolledCourses.filter((id) => id !== courseId),
       });
     }
 
     return true;
   };
 
-  const createCourse = (courseData: Omit<Course, 'id' | 'instructor' | 'instructorName' | 'enrolledStudents' | 'createdAt' | 'updatedAt'>): Course => {
+  const createCourse = (
+    courseData: Omit<
+      Course,
+      | 'id'
+      | 'instructor'
+      | 'instructorName'
+      | 'enrolledStudents'
+      | 'createdAt'
+      | 'updatedAt'
+    >
+  ): Course => {
     if (!user || user.role !== 'instructor') {
       throw new Error('Only instructors can create courses');
     }
@@ -142,7 +185,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updatedAt: new Date(),
     };
 
-    setCourses(prev => [...prev, newCourse]);
+    setCourses((prev) => [...prev, newCourse]);
 
     // Update instructor's created courses
     if (user.createdCourses) {
@@ -158,10 +201,13 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return newCourse;
   };
 
-  const updateCourse = (courseId: string, courseData: Partial<Course>): boolean => {
+  const updateCourse = (
+    courseId: string,
+    courseData: Partial<Course>
+  ): boolean => {
     if (!user || user.role !== 'instructor') return false;
 
-    const courseIndex = courses.findIndex(c => c.id === courseId);
+    const courseIndex = courses.findIndex((c) => c.id === courseId);
     if (courseIndex === -1) return false;
 
     // Verify the user is the course instructor
@@ -181,29 +227,32 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const deleteCourse = (courseId: string): boolean => {
     if (!user || user.role !== 'instructor') return false;
 
-    const courseIndex = courses.findIndex(c => c.id === courseId);
+    const courseIndex = courses.findIndex((c) => c.id === courseId);
     if (courseIndex === -1) return false;
 
     // Verify the user is the course instructor
     if (courses[courseIndex].instructor !== user.id) return false;
 
     // Remove the course
-    setCourses(prev => prev.filter(course => course.id !== courseId));
+    setCourses((prev) => prev.filter((course) => course.id !== courseId));
 
     // Update instructor's created courses
     if (user.createdCourses) {
       updateUser({
-        createdCourses: user.createdCourses.filter(id => id !== courseId),
+        createdCourses: user.createdCourses.filter((id) => id !== courseId),
       });
     }
 
     return true;
   };
 
-  const addLesson = (courseId: string, lessonData: Omit<Lesson, 'id'>): boolean => {
+  const addLesson = (
+    courseId: string,
+    lessonData: Omit<Lesson, 'id'>
+  ): boolean => {
     if (!user || user.role !== 'instructor') return false;
 
-    const courseIndex = courses.findIndex(c => c.id === courseId);
+    const courseIndex = courses.findIndex((c) => c.id === courseId);
     if (courseIndex === -1) return false;
 
     // Verify the user is the course instructor
@@ -228,7 +277,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const markLessonComplete = (courseId: string, lessonId: string) => {
     if (!user) return;
 
-    setCourseProgress(prev => {
+    setCourseProgress((prev) => {
       const progress = prev[courseId] || {
         courseId,
         completedLessons: [],
@@ -252,7 +301,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const getProgress = (courseId: string): number => {
-    const course = courses.find(c => c.id === courseId);
+    const course = courses.find((c) => c.id === courseId);
     if (!course) return 0;
 
     const progress = courseProgress[courseId];
