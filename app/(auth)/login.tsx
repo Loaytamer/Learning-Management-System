@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,7 +16,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setError('Please enter both email and password.');
       return;
     }
 
@@ -24,10 +24,15 @@ export default function LoginScreen() {
     setIsSubmitting(true);
 
     try {
-      await login(email, password);
-      router.replace('/(tabs)');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to login');
+      const success = await login(email, password);
+      if (success) {
+        router.replace('/');
+      } else {
+        setError('Invalid email or password. Try using student1@example.com / 123456 or instructor1@example.com / 123456');
+      }
+    } catch (err) {
+      setError('An error occurred. Please try again.');
+      console.error(err);
     } finally {
       setIsSubmitting(false);
     }
