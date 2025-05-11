@@ -6,29 +6,38 @@ import { Clock, Users, Star } from 'lucide-react-native';
 
 interface CourseCardProps {
   course: Course;
-  onEnroll?: (courseId: string) => void;
+  onEnroll?: (courseId: string) => Promise<boolean>;
   isEnrolled?: boolean;
 }
 
 const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll, isEnrolled = false }) => {
   const router = useRouter();
+  const [isLoading, setIsLoading] = React.useState(false);
 
   const handlePress = () => {
     router.push(`/course/${course.id}`);
   };
 
-  const handleEnroll = () => {
+  const handleEnroll = async () => {
     if (onEnroll) {
-      onEnroll(course.id);
+      setIsLoading(true);
+      try {
+        await onEnroll(course.id);
+      } catch (error) {
+        console.error('Failed to enroll:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
   return (
     <TouchableOpacity style={styles.container} onPress={handlePress} activeOpacity={0.8}>
       <ImageBackground
-        source={{ uri: course.thumbnail }}
+        source={course.thumbnail ? { uri: course.thumbnail } : require('../../assets/images/course-placeholder.png')}
         style={styles.image}
         imageStyle={{ borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
+        defaultSource={require('../../assets/images/course-placeholder.png')}
       >
         <View style={styles.levelBadge}>
           <Text style={styles.levelText}>{course.level}</Text>
@@ -62,11 +71,12 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll, isEnrolled = 
           <Text style={styles.price}>${course.price.toFixed(2)}</Text>
           {!isEnrolled && onEnroll && (
             <TouchableOpacity 
-              style={styles.enrollButton} 
+              style={[styles.enrollButton, isLoading && styles.enrollButtonDisabled]} 
               onPress={handleEnroll}
               activeOpacity={0.7}
+              disabled={isLoading}
             >
-              <Text style={styles.enrollText}>Enroll</Text>
+              <Text style={styles.enrollText}>{isLoading ? 'Enrolling...' : 'Enroll'}</Text>
             </TouchableOpacity>
           )}
           {isEnrolled && (
@@ -91,6 +101,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.22,
     shadowRadius: 2.22,
+  },
+  enrollButtonDisabled: {
+    backgroundColor: '#4B5563',
+    opacity: 0.7,
   },
   image: {
     height: 160,
