@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
+const cloudinary = require("../config/cloudinary");
 
 // JWT secret key (should be in environment variables in production)
 const JWT_SECRET = "your-secret-key";
@@ -116,7 +117,8 @@ exports.getCurrentUser = async (req, res) => {
 
 exports.uploadProfileImage = async (req, res) => {
   try {
-    const userId = req.user?._id;
+    const userId = req.user?.id;
+    console.log(userId);
     const imageUrl = req.file.path;
 
     // Update user profile image
@@ -133,5 +135,44 @@ exports.uploadProfileImage = async (req, res) => {
       success: false,
       message: "Image upload failed",
     });
+  }
+};
+
+
+exports.deleteProfileImageController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+
+    if (!user || !user.profileImage) {
+      return res.status(404).json({ message: "User or image not found" });
+    }
+
+    const imageUrl = user.profileImage;
+
+   
+    const parts = imageUrl.split("/");
+    const fileName = parts[parts.length - 1]; // abc123.jpg
+    const folder = parts[parts.length - 2]; // user_profiles
+
+    const public_id = `${folder}/${fileName.split(".")[0]}`; 
+
+    const result = await cloudinary.uploader.destroy(public_id);
+
+    if (result.result !== "ok") {
+      return res
+        .status(400)
+        .json({ message: "Failed to delete image", result });
+    }
+
+    
+    user.profileImage = null;
+    await user.save();
+
+    return res.status(200).json({ message: "Image deleted successfully" });
+  } catch (error) {
+    console.error("Delete error:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
