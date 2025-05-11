@@ -21,9 +21,9 @@ export const getAllCourses = async (): Promise<Course[]> => {
     const response = await api.get('/');
     console.log('API Response:', response.data); // Debug log
     if (response.status !== 200) throw new Error('Failed to fetch courses');
-    const courses = response.data.map(course => ({
+    const courses = response.data.map((course: Course) => ({
       ...course,
-      id: course._id, // Map _id to id
+     id: course._id,
     }));
     return courses as Course[];
   } catch (error: any) {

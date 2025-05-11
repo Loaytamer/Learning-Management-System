@@ -55,33 +55,25 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const loadCourses = async () => {
     try {
-      const response = await courseAPI.getAllCourses();
-      console.log('Raw response from getAllCourses:', response); // Debug raw response
-      const validCourses = Array.isArray(response) 
-        ? response
-            .map(course => course && course.id ? { ...course, id: course.id } : null)
-            .filter((course): course is Course => course !== null)
-        : [];
-      setCourses(validCourses);
-      console.log('Courses loaded:', validCourses.map(c => c.id)); // Log valid course IDs
+      const coursesData = await courseAPI.getAllCourses();
+      setCourses(coursesData);
+      console.log('Courses loaded:', coursesData.map(c => c.id)); // Debug log
     } catch (error) {
       console.error('Failed to load courses:', error);
     }
   };
 
+  // Filter courses for the current user
   const enrolledCourses = user && user.id
-    ? courses.filter(course => course && course.enrolledStudents && course.enrolledStudents.includes(user.id))
+    ? courses.filter(course => course.enrolledStudents && course.enrolledStudents.includes(user.id))
     : [];
 
   const instructorCourses = user?.role === 'instructor' && user.id
-    ? courses.filter(course => course && course.instructor && course.instructor.toString() === user.id)
+    ? courses.filter(course => course.instructor && course.instructor.toString() === user.id)
     : [];
 
   const getCourse = (id: string): Course | undefined => {
-    if (!id) {
-      console.warn('getCourse called with undefined id');
-      return undefined;
-    }
+    if (!id) return undefined;
     const course = courses.find(course => course && course.id === id);
     if (!course) console.warn(`Course with id ${id} not found in local state`);
     return course;
@@ -93,13 +85,8 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       throw new Error('You must be logged in to enroll in a course');
     }
 
-    if (!courseId) {
-      console.error('Invalid courseId:', courseId, 'Stack trace:', new Error().stack);
-      throw new Error('Invalid course ID');
-    }
-
     try {
-      console.log('Attempting to enroll in courseId:', courseId); // Debug log
+      // Validate course exists in the database
       const courseData = await courseAPI.getCourseById(courseId);
       if (!courseData) {
         console.error(`Course with id ${courseId} not found in database`);
@@ -111,18 +98,22 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         throw new Error('You are already enrolled in this course');
       }
 
+      // Perform enrollment via API
       const response = await courseAPI.enrollInCourse(courseId);
       if (!response) {
         throw new Error('Enrollment failed on server');
       }
 
+      // Update user enrolledCourses in the database
       const updatedUserEnrolledCourses = user.enrolledCourses
         ? [...user.enrolledCourses, courseId]
         : [courseId];
       await updateUser({ enrolledCourses: updatedUserEnrolledCourses });
 
+      // Refresh local course state
       await loadCourses();
 
+      // Initialize or update course progress
       setCourseProgress(prev => ({
         ...prev,
         [courseId]: {
@@ -136,7 +127,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log(`Successfully enrolled in course ${courseId}`);
       return true;
     } catch (error: any) {
-      console.error('Failed to enroll in course:', error.message, 'Stack trace:', error.stack);
+      console.error('Failed to enroll in course:', error.message);
       throw error instanceof Error ? error : new Error(error.message || 'Failed to enroll in course');
     }
   };
@@ -144,11 +135,6 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const unenrollFromCourse = async (courseId: string): Promise<boolean> => {
     if (!user) {
       console.error('User not authenticated');
-      return false;
-    }
-
-    if (!courseId) {
-      console.error('Invalid courseId:', courseId);
       return false;
     }
 
@@ -164,11 +150,13 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         throw new Error('Unenrollment failed on server');
       }
 
+      // Update user enrolledCourses in the database
       const updatedUserEnrolledCourses = user.enrolledCourses
         ? user.enrolledCourses.filter(id => id !== courseId)
         : [];
       await updateUser({ enrolledCourses: updatedUserEnrolledCourses });
 
+      // Refresh local course state
       await loadCourses();
 
       console.log(`Successfully unenrolled from course ${courseId}`);
@@ -196,7 +184,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
       await loadCourses();
       console.log(`Successfully created course with id ${newCourse.id}`);
-      return { ...newCourse, id: newCourse.id }; // Map id to id
+      return newCourse;
     } catch (error) {
       console.error('Failed to create course:', error);
       throw error;
