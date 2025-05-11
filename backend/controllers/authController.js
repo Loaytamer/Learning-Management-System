@@ -137,110 +137,61 @@ exports.getCurrentUser = async (req, res) => {
 exports.uploadProfileImage = async (req, res) => {
   try {
     const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "No file uploaded",
-      });
-    }
-
-    // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: "user_profiles",
-    });
-
-    const imageUrl = result.secure_url;
+    console.log(userId);
+    const imageUrl = req.file.path;
 
     // Update user profile image
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { profileImage: imageUrl },
-      { new: true, runValidators: true }
-    ).select("-password");
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
+    await User.findByIdAndUpdate(userId, { profileImage: imageUrl });
 
     res.status(200).json({
       success: true,
       message: "Image uploaded successfully",
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        profileImage: user.profileImage,
-      },
+      imageUrl,
     });
   } catch (error) {
     console.error("Upload Error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Image upload failed",
+      message: "Image upload failed",
     });
   }
 };
 
-// Delete profile image
+
 exports.deleteProfileImageController = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const user = await User.findById(userId).select("-password");
+    const user = await User.findById(userId);
+
     if (!user || !user.profileImage) {
-      return res.status(404).json({
-        success: false,
-        message: "User or image not found",
-      });
+      return res.status(404).json({ message: "User or image not found" });
     }
 
     const imageUrl = user.profileImage;
-    const publicId = imageUrl
-      .split("/")
-      .slice(-2)
-      .join("/")
-      .split(".")[0]; // Handles dynamic folder structure
 
-    const result = await cloudinary.uploader.destroy(publicId);
+   
+    const parts = imageUrl.split("/");
+    const fileName = parts[parts.length - 1]; // abc123.jpg
+    const folder = parts[parts.length - 2]; // user_profiles
+
+    const public_id = `${folder}/${fileName.split(".")[0]}`; 
+
+    const result = await cloudinary.uploader.destroy(public_id);
 
     if (result.result !== "ok") {
-      return res.status(400).json({
-        success: false,
-        message: "Failed to delete image",
-        result,
-      });
+      return res
+        .status(400)
+        .json({ message: "Failed to delete image", result });
     }
 
+    
     user.profileImage = null;
     await user.save();
 
-    res.status(200).json({
-      success: true,
-      message: "Image deleted successfully",
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        profileImage: user.profileImage,
-      },
-    });
+    return res.status(200).json({ message: "Image deleted successfully" });
   } catch (error) {
     console.error("Delete error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Internal server error",
-    });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
