@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState } from 'react';
-import MOCK_COURSES, { Course, Lesson } from '../data/courses';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Course, Lesson } from '../data/courses';
 import { useAuth } from './AuthContext';
+import * as courseAPI from '../api/courses';
 
 interface CourseProgress {
   courseId: string;
@@ -15,12 +16,12 @@ interface CourseContextProps {
   instructorCourses: Course[];
   courseProgress: Record<string, CourseProgress>;
   getCourse: (id: string) => Course | undefined;
-  enrollInCourse: (courseId: string) => boolean;
-  unenrollFromCourse: (courseId: string) => boolean;
-  createCourse: (course: Omit<Course, 'id' | 'instructor' | 'instructorName' | 'enrolledStudents' | 'createdAt' | 'updatedAt'>) => Course;
-  updateCourse: (courseId: string, courseData: Partial<Course>) => boolean;
-  deleteCourse: (courseId: string) => boolean;
-  addLesson: (courseId: string, lesson: Omit<Lesson, 'id'>) => boolean;
+  enrollInCourse: (courseId: string) => Promise<boolean>;
+  unenrollFromCourse: (courseId: string) => Promise<boolean>;
+  createCourse: (course: Omit<Course, 'id' | 'instructor' | 'instructorName' | 'enrolledStudents' | 'createdAt' | 'updatedAt'>) => Promise<Course>;
+  updateCourse: (courseId: string, courseData: Partial<Course>) => Promise<boolean>;
+  deleteCourse: (courseId: string) => Promise<boolean>;
+  addLesson: (courseId: string, lesson: Omit<Lesson, 'id'>) => Promise<boolean>;
   markLessonComplete: (courseId: string, lessonId: string) => void;
   getProgress: (courseId: string) => number;
 }
@@ -31,12 +32,12 @@ const CourseContext = createContext<CourseContextProps>({
   instructorCourses: [],
   courseProgress: {},
   getCourse: () => undefined,
-  enrollInCourse: () => false,
-  unenrollFromCourse: () => false,
-  createCourse: () => ({} as Course),
-  updateCourse: () => false,
-  deleteCourse: () => false,
-  addLesson: () => false,
+  enrollInCourse: async () => Promise.resolve(false),
+  unenrollFromCourse: async () => Promise.resolve(false),
+  createCourse: async () => Promise.resolve({} as Course),
+  updateCourse: async () => Promise.resolve(false),
+  deleteCourse: async () => Promise.resolve(false),
+  addLesson: async () => Promise.resolve(false),
   markLessonComplete: () => {},
   getProgress: () => 0,
 });
@@ -45,7 +46,20 @@ export const useCourses = () => useContext(CourseContext);
 
 export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, updateUser } = useAuth();
-  const [courses, setCourses] = useState<Course[]>(MOCK_COURSES);
+  const [courses, setCourses] = useState<Course[]>([]);
+
+  useEffect(() => {
+    loadCourses();
+  }, []);
+
+  const loadCourses = async () => {
+    try {
+      const coursesData = await courseAPI.getAllCourses();
+      setCourses(coursesData);
+    } catch (error) {
+      console.error('Failed to load courses:', error);
+    }
+  };
   const [courseProgress, setCourseProgress] = useState<Record<string, CourseProgress>>({});
 
   // Filter courses for the current user
@@ -61,168 +75,96 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return courses.find(course => course.id === id);
   };
 
-  const enrollInCourse = (courseId: string): boolean => {
+  const enrollInCourse = async (courseId: string): Promise<boolean> => {
     if (!user) return false;
 
-    const courseIndex = courses.findIndex(c => c.id === courseId);
-    if (courseIndex === -1) return false;
+    try {
+      await courseAPI.enrollInCourse(courseId);
+      await loadCourses(); // Reload courses to get updated enrollment status
+      
+      // Initialize course progress
+      setCourseProgress(prev => ({
+        ...prev,
+        [courseId]: {
+          courseId,
+          completedLessons: [],
+          lastAccessedLessonId: null,
+          quizScores: {},
+        },
+      }));
 
-    // Check if already enrolled
-    if (courses[courseIndex].enrolledStudents.includes(user.id)) {
       return true;
+    } catch (error) {
+      console.error('Failed to enroll in course:', error);
+      return false;
     }
-
-    // Update the course's enrolled students
-    const updatedCourses = [...courses];
-    updatedCourses[courseIndex] = {
-      ...updatedCourses[courseIndex],
-      enrolledStudents: [...updatedCourses[courseIndex].enrolledStudents, user.id],
-    };
-    setCourses(updatedCourses);
-
-    // Update user's enrolled courses
-    if (user && !user.enrolledCourses.includes(courseId)) {
-      updateUser({
-        enrolledCourses: [...user.enrolledCourses, courseId],
-      });
-    }
-
-    // Initialize course progress
-    setCourseProgress(prev => ({
-      ...prev,
-      [courseId]: {
-        courseId,
-        completedLessons: [],
-        lastAccessedLessonId: null,
-        quizScores: {},
-      },
-    }));
-
-    return true;
   };
 
-  const unenrollFromCourse = (courseId: string): boolean => {
+  const unenrollFromCourse = async (courseId: string): Promise<boolean> => {
     if (!user) return false;
 
-    const courseIndex = courses.findIndex(c => c.id === courseId);
-    if (courseIndex === -1) return false;
-
-    // Update the course's enrolled students
-    const updatedCourses = [...courses];
-    updatedCourses[courseIndex] = {
-      ...updatedCourses[courseIndex],
-      enrolledStudents: updatedCourses[courseIndex].enrolledStudents.filter(
-        id => id !== user.id
-      ),
-    };
-    setCourses(updatedCourses);
-
-    // Update user's enrolled courses
-    if (user) {
-      updateUser({
-        enrolledCourses: user.enrolledCourses.filter(id => id !== courseId),
-      });
+    try {
+      await courseAPI.unenrollFromCourse(courseId);
+      await loadCourses(); // Reload courses to get updated enrollment status
+      return true;
+    } catch (error) {
+      console.error('Failed to unenroll from course:', error);
+      return false;
     }
-
-    return true;
   };
 
-  const createCourse = (courseData: Omit<Course, 'id' | 'instructor' | 'instructorName' | 'enrolledStudents' | 'createdAt' | 'updatedAt'>): Course => {
+  const createCourse = async (courseData: Omit<Course, 'id' | 'instructor' | 'instructorName' | 'enrolledStudents' | 'createdAt' | 'updatedAt'>): Promise<Course> => {
     if (!user || user.role !== 'instructor') {
       throw new Error('Only instructors can create courses');
     }
 
-    const newCourse: Course = {
-      ...courseData,
-      id: `course${courses.length + 1}`,
-      instructor: user.id,
-      instructorName: user.username,
-      enrolledStudents: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    setCourses(prev => [...prev, newCourse]);
-
-    // Update instructor's created courses
-    if (user.createdCourses) {
-      updateUser({
-        createdCourses: [...user.createdCourses, newCourse.id],
-      });
-    } else {
-      updateUser({
-        createdCourses: [newCourse.id],
-      });
+    try {
+      const newCourse = await courseAPI.createCourse(courseData);
+      await loadCourses(); // Reload courses to include the new course
+      return newCourse;
+    } catch (error) {
+      console.error('Failed to create course:', error);
+      throw error;
     }
-
-    return newCourse;
   };
 
-  const updateCourse = (courseId: string, courseData: Partial<Course>): boolean => {
+  const updateCourse = async (courseId: string, courseData: Partial<Course>): Promise<boolean> => {
     if (!user || user.role !== 'instructor') return false;
 
-    const courseIndex = courses.findIndex(c => c.id === courseId);
-    if (courseIndex === -1) return false;
-
-    // Verify the user is the course instructor
-    if (courses[courseIndex].instructor !== user.id) return false;
-
-    const updatedCourses = [...courses];
-    updatedCourses[courseIndex] = {
-      ...updatedCourses[courseIndex],
-      ...courseData,
-      updatedAt: new Date(),
-    };
-    setCourses(updatedCourses);
-
-    return true;
-  };
-
-  const deleteCourse = (courseId: string): boolean => {
-    if (!user || user.role !== 'instructor') return false;
-
-    const courseIndex = courses.findIndex(c => c.id === courseId);
-    if (courseIndex === -1) return false;
-
-    // Verify the user is the course instructor
-    if (courses[courseIndex].instructor !== user.id) return false;
-
-    // Remove the course
-    setCourses(prev => prev.filter(course => course.id !== courseId));
-
-    // Update instructor's created courses
-    if (user.createdCourses) {
-      updateUser({
-        createdCourses: user.createdCourses.filter(id => id !== courseId),
-      });
+    try {
+      await courseAPI.updateCourse(courseId, courseData);
+      await loadCourses(); // Reload courses to get updated course data
+      return true;
+    } catch (error) {
+      console.error('Failed to update course:', error);
+      return false;
     }
-
-    return true;
   };
 
-  const addLesson = (courseId: string, lessonData: Omit<Lesson, 'id'>): boolean => {
+  const deleteCourse = async (courseId: string): Promise<boolean> => {
     if (!user || user.role !== 'instructor') return false;
 
-    const courseIndex = courses.findIndex(c => c.id === courseId);
-    if (courseIndex === -1) return false;
+    try {
+      await courseAPI.deleteCourse(courseId);
+      await loadCourses(); // Reload courses to remove the deleted course
+      return true;
+    } catch (error) {
+      console.error('Failed to delete course:', error);
+      return false;
+    }
+  };
 
-    // Verify the user is the course instructor
-    if (courses[courseIndex].instructor !== user.id) return false;
+  const addLesson = async (courseId: string, lessonData: Omit<Lesson, 'id'>): Promise<boolean> => {
+    if (!user || user.role !== 'instructor') return false;
 
-    const newLesson: Lesson = {
-      ...lessonData,
-      id: `lesson-${courseId}-${courses[courseIndex].lessons.length + 1}`,
-    };
-
-    const updatedCourses = [...courses];
-    updatedCourses[courseIndex] = {
-      ...updatedCourses[courseIndex],
-      lessons: [...updatedCourses[courseIndex].lessons, newLesson],
-      updatedAt: new Date(),
-    };
-    setCourses(updatedCourses);
-
-    return true;
+    try {
+      await courseAPI.addLesson(courseId, lessonData);
+      await loadCourses(); // Reload courses to include the new lesson
+      return true;
+    } catch (error) {
+      console.error('Failed to add lesson:', error);
+      return false;
+    }
   };
 
   const markLessonComplete = (courseId: string, lessonId: string) => {

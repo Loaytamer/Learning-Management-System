@@ -202,7 +202,9 @@ export default function HomeScreen() {
           data={recommendedCourses}
           renderItem={renderCourseItem}
           keyExtractor={(item) => item.id}
-          scrollEnabled={false}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.recommendedList}
         />
       </ScrollView>
     </View>
@@ -363,4 +365,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: 'Inter-SemiBold',
   },
+  recommendedList:{
+    paddingHorizontal: 16, // Padding on the left and right for the list
+  paddingVertical: 8, // Small vertical padding for breathing room
+  gap: 16,
+  }
 });
