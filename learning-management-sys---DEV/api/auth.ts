@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const API_URL = 'http://192.168.8.115:5000/api/auth';
+// const API_URL = 'http://192.168.8.115:5000/api/auth';
 // const API_URL = 'http://192.168.1.6:5000/api/auth'; // Loay
 const AUTH_TOKEN_KEY = 'auth_token';
 
