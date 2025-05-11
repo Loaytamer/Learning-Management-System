@@ -10,7 +10,7 @@ import {
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
+// import { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 
 
 const CustomTabBar: React.FC<BottomTabBarProps> = ({
@@ -72,7 +72,7 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
             accessibilityLabel={options.tabBarAccessibilityLabel}
-            testID={options.tabBarTestID}
+            // testID={options.tabBarTestID}
             onPress={onPress}
             style={styles.tab}
             activeOpacity={0.7}

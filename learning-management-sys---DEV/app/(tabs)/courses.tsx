@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity, StatusBar } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
 import { useCourses } from '../../contexts/CourseContext';
 import { useAuth } from '../../contexts/AuthContext';
 import CourseCard from '../../components/ui/CourseCard';
 import { Search, Filter, X } from 'lucide-react-native';
+import { Course } from '@/data/courses';
 
 export default function CoursesScreen() {
   const { courses, enrolledCourses, enrollInCourse } = useCourses();
@@ -14,26 +15,31 @@ export default function CoursesScreen() {
 
   // Extract unique categories from courses
   const categories = Array.from(new Set(courses.map(course => course.category)));
-  
+
   // Extract unique levels from courses
   const levels = Array.from(new Set(courses.map(course => course.level)));
 
   const filteredCourses = courses.filter(course => {
     // Apply search filter
-    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          course.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
+    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.description.toLowerCase().includes(searchQuery.toLowerCase());
+
     // Apply category filter
     const matchesCategory = !selectedCategory || course.category === selectedCategory;
-    
+
     // Apply level filter
     const matchesLevel = !selectedLevel || course.level === selectedLevel;
-    
+
     return matchesSearch && matchesCategory && matchesLevel;
   });
 
   const handleEnroll = async (courseId: string): Promise<boolean> => {
-    return enrollInCourse(courseId);
+    try {
+      return await enrollInCourse(courseId);
+    } catch (error) {
+      console.error('Failed to enroll:', error);
+      return false;
+    }
   };
 
   const resetFilters = () => {
@@ -41,63 +47,23 @@ export default function CoursesScreen() {
     setSelectedLevel(null);
   };
 
-  const renderCourseItem = ({ item }: { item: any }) => {
+  const renderCourseItem = ({ item }: { item: Course }) => {
     return (
-      <CourseCard 
-        course={item} 
+      <CourseCard
+        course={item}
         onEnroll={handleEnroll}
         isEnrolled={enrolledCourses.some(c => c.id === item.id)}
       />
     );
   };
 
-  const renderCategoryPill = (category: string) => (
-    <TouchableOpacity
-      key={category}
-      style={[
-        styles.filterPill,
-        selectedCategory === category && styles.filterPillActive,
-      ]}
-      onPress={() => setSelectedCategory(selectedCategory === category ? null : category)}
-    >
-      <Text
-        style={[
-          styles.filterPillText,
-          selectedCategory === category && styles.filterPillTextActive,
-        ]}
-      >
-        {category}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  const renderLevelPill = (level: string) => (
-    <TouchableOpacity
-      key={level}
-      style={[
-        styles.filterPill,
-        selectedLevel === level && styles.filterPillActive,
-      ]}
-      onPress={() => setSelectedLevel(selectedLevel === level ? null : level)}
-    >
-      <Text
-        style={[
-          styles.filterPillText,
-          selectedLevel === level && styles.filterPillTextActive,
-        ]}
-      >
-        {level}
-      </Text>
-    </TouchableOpacity>
-  );
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       <View style={styles.header}>
         <Text style={styles.title}>Browse Courses</Text>
-        
+
         <View style={styles.searchContainer}>
           <Search size={20} color="#9CA3AF" style={styles.searchIcon} />
           <TextInput
@@ -114,36 +80,72 @@ export default function CoursesScreen() {
           )}
         </View>
       </View>
-      
+
       <View style={styles.filtersContainer}>
         <View style={styles.filterHeader}>
           <View style={styles.filterTitleContainer}>
             <Filter size={16} color="#D1D5DB" />
             <Text style={styles.filterTitle}>Filters</Text>
           </View>
-          
+
           {(selectedCategory || selectedLevel) && (
             <TouchableOpacity onPress={resetFilters}>
               <Text style={styles.resetText}>Reset</Text>
             </TouchableOpacity>
           )}
         </View>
-        
+
         <Text style={styles.filterLabel}>Categories</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsContainer}>
-          {categories.map(renderCategoryPill)}
+          {categories.map(category => (
+            <TouchableOpacity
+              key={category}
+              style={[
+                styles.filterPill,
+                selectedCategory === category && styles.filterPillActive,
+              ]}
+              onPress={() => setSelectedCategory(selectedCategory === category ? null : category)}
+            >
+              <Text
+                style={[
+                  styles.filterPillText,
+                  selectedCategory === category && styles.filterPillTextActive,
+                ]}
+              >
+                {category}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
-        
+
         <Text style={styles.filterLabel}>Level</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsContainer}>
-          {levels.map(renderLevelPill)}
+          {levels.map(level => (
+            <TouchableOpacity
+              key={level}
+              style={[
+                styles.filterPill,
+                selectedLevel === level && styles.filterPillActive,
+              ]}
+              onPress={() => setSelectedLevel(selectedLevel === level ? null : level)}
+            >
+              <Text
+                style={[
+                  styles.filterPillText,
+                  selectedLevel === level && styles.filterPillTextActive,
+                ]}
+              >
+                {level}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
       </View>
-      
+
       <FlatList
         data={filteredCourses}
         renderItem={renderCourseItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -157,9 +159,7 @@ export default function CoursesScreen() {
       />
     </View>
   );
-}
-
-import { ScrollView } from 'react-native';
+} 
 
 const styles = StyleSheet.create({
   container: {

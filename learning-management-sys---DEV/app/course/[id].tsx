@@ -30,6 +30,13 @@ import {
 import LessonCard from '../../components/ui/LessonCard';
 import { Lesson } from '../../data/courses';
 
+interface CourseProgress {
+  courseId: string;
+  completedLessons: string[];
+  lastAccessedLessonId: string | null;
+  quizScores: Record<string, number>;
+}
+
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
@@ -39,13 +46,15 @@ export default function CourseDetailScreen() {
     instructorCourses,
     enrolledCourses,
     addLesson,
+    courseProgress,
+    getProgress,
   } = useCourses();
   const router = useRouter();
 
   const course = getCourse(id);
   const isEnrolled = course && enrolledCourses.some((c) => c.id === course.id);
   const isInstructor = user && user.role === 'instructor';
-  const isOwner = isInstructor && course && course.instructor === user.id;
+  const isOwner = isInstructor && course && course.instructor && user.id && course.instructor === user.id;
 
   const [isAddLessonModalVisible, setIsAddLessonModalVisible] = useState(false);
   const [newLessonTitle, setNewLessonTitle] = useState('');
@@ -67,33 +76,57 @@ export default function CourseDetailScreen() {
     );
   }
 
-  const handleEnroll = () => {
+  const handleEnroll = async () => {
     if (course) {
-      const success = enrollInCourse(course.id);
-      if (success) {
-        Alert.alert(
-          'Enrolled Successfully',
-          `You have successfully enrolled in ${course.title}!`,
-          [
-            {
-              text: 'Start Learning',
-              onPress: () => {
-                if (course.lessons.length > 0) {
-                  router.push(`/lesson/${course.lessons[0].id}`);
-                }
+      try {
+        const success = await enrollInCourse(course.id);
+        if (success) {
+          Alert.alert(
+            'Enrolled Successfully',
+            `You have successfully enrolled in ${course.title}!`,
+            [
+              {
+                text: 'Start Learning',
+                onPress: () => {
+                  if (course.lessons && course.lessons.length > 0) {
+                    router.push(`/lesson/${course.lessons[0].id}`);
+                  }
+                },
               },
-            },
-          ]
+              {
+                text: 'View Course',
+                style: 'default',
+              }
+            ]
+          );
+        }
+      } catch (error: any) {
+        Alert.alert(
+          'Enrollment Failed',
+          error.message || 'Failed to enroll in course. Please try again later.'
         );
       }
     }
   };
 
   const handleStartLearning = () => {
-    if (course.lessons.length > 0) {
-      router.push(`/lesson/${course.lessons[0].id}`);
+    if (course.lessons && course.lessons.length > 0) {
+      // Find the last accessed lesson or start from the beginning
+      const progress = courseProgress[course.id] || {
+        courseId: course.id,
+        completedLessons: [],
+        lastAccessedLessonId: null,
+        quizScores: {},
+      };
+      const lastLessonId = progress.lastAccessedLessonId;
+      const firstUncompletedLesson = course.lessons.find(
+        lesson => !progress.completedLessons.includes(lesson.id)
+      );
+      
+      const targetLessonId = lastLessonId || (firstUncompletedLesson?.id || course.lessons[0].id);
+      router.push(`/lesson/${targetLessonId}`);
     } else {
-      Alert.alert('No Lessons', 'This course has no lessons yet.');
+      Alert.alert('No Lessons', 'This course has no lessons available yet.');
     }
   };
 
@@ -106,7 +139,7 @@ export default function CourseDetailScreen() {
     setIsAddLessonModalVisible(true);
   };
 
-  const submitNewLesson = () => {
+  const submitNewLesson = async () => {
     if (
       !newLessonTitle ||
       !newLessonDescription ||
@@ -117,7 +150,7 @@ export default function CourseDetailScreen() {
       return;
     }
 
-    const success = addLesson(course.id, {
+    const success = await addLesson(course.id, {
       title: newLessonTitle,
       description: newLessonDescription,
       duration: parseInt(newLessonDuration, 10),
@@ -187,69 +220,85 @@ export default function CourseDetailScreen() {
 
           <View style={styles.divider} />
 
-          <View style={styles.priceSection}>
-            <View style={styles.priceContainer}>
-              <DollarSign size={18} color="#F9FAFB" />
-              <Text style={styles.price}>{course.price.toFixed(2)}</Text>
-            </View>
-
-            {!isEnrolled && !isOwner && (
-              <TouchableOpacity
-                style={styles.enrollButton}
-                onPress={handleEnroll}
-              >
-                <Text style={styles.enrollButtonText}>Enroll Now</Text>
-              </TouchableOpacity>
-            )}
-
-            {isEnrolled && (
-              <TouchableOpacity
-                style={styles.startLearningButton}
-                onPress={handleStartLearning}
-              >
-                <Play size={16} color="#FFFFFF" />
-                <Text style={styles.startLearningText}>Start Learning</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.divider} />
-
-          <Text style={styles.sectionTitle}>About this course</Text>
-          <Text style={styles.description}>{course.description}</Text>
-
-          <View style={styles.lessonsHeader}>
-            <Text style={styles.sectionTitle}>Lessons</Text>
-            {isOwner && (
-              <TouchableOpacity
-                style={styles.addLessonButton}
-                onPress={handleAddLesson}
-              >
-                <Plus size={16} color="#FFFFFF" />
-                <Text style={styles.addLessonText}>Add Lesson</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {course.lessons.length > 0 ? (
-            course.lessons.map((lesson, index) => (
-              <LessonCard
-                key={lesson.id}
-                lesson={lesson}
-                index={index}
-                onPress={handleLessonPress}
-                isCompleted={false} // In a real app, this would be determined by the user's progress
-              />
-            ))
-          ) : (
-            <View style={styles.emptyLessons}>
-              <Text style={styles.emptyLessonsText}>
-                {isOwner
-                  ? 'No lessons yet. Add your first lesson!'
-                  : 'No lessons available for this course yet.'}
+          {/* Course Progress Section */}
+          {isEnrolled && (
+            <View style={styles.progressSection}>
+              <Text style={styles.sectionTitle}>Your Progress</Text>
+              <View style={styles.progressBar}>
+                <View 
+                  style={[
+                    styles.progressFill, 
+                    { width: `${getProgress(course.id)}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {getProgress(course.id)}% Complete
               </Text>
             </View>
           )}
+
+          {/* Course Description */}
+          <View style={styles.descriptionSection}>
+            <Text style={styles.sectionTitle}>About this course</Text>
+            <Text style={styles.description}>{course.description}</Text>
+          </View>
+
+          {/* Course Content Section */}
+          <View style={styles.contentSection}>
+            <Text style={styles.sectionTitle}>Course Content</Text>
+            <Text style={styles.contentStats}>
+              {course.lessons.length} lessons • {course.duration} total hours
+            </Text>
+            
+            {course.lessons.map((lesson, index) => {
+              const progress = courseProgress[course.id] || {
+                courseId: course.id,
+                completedLessons: [],
+                lastAccessedLessonId: null,
+                quizScores: {},
+              };
+              const isCompleted = progress.completedLessons.includes(lesson.id);
+              const isCurrentLesson = progress.lastAccessedLessonId === lesson.id;
+              const previousLessonCompleted = index === 0 || 
+                (course.lessons[index - 1] && progress.completedLessons.includes(course.lessons[index - 1].id));
+              const isLocked = !isEnrolled || (!isCompleted && !previousLessonCompleted && index !== 0);
+
+              return (
+                <LessonCard
+                  key={lesson.id}
+                  lesson={lesson}
+                  index={index + 1}
+                  isCompleted={isCompleted}
+                  isCurrentLesson={isCurrentLesson}
+                  isLocked={isLocked}
+                  onPress={() => isEnrolled ? handleLessonPress(lesson) : handleEnroll()}
+                />
+              );
+            })}
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            {isEnrolled ? (
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={handleStartLearning}
+              >
+                <Play size={20} color="#FFFFFF" />
+                <Text style={styles.buttonText}>
+                  {courseProgress[course.id]?.lastAccessedLessonId ? 'Continue Learning' : 'Start Learning'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={handleEnroll}
+              >
+                <Text style={styles.buttonText}>Enroll Now - {course.price ? `$${course.price.toFixed(2)}` : 'Free'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </ScrollView>
 
@@ -616,5 +665,52 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
     fontFamily: 'Inter-SemiBold',
+  },
+  progressSection: {
+    marginVertical: 20,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    marginVertical: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  descriptionSection: {
+    marginVertical: 20,
+  },
+  contentSection: {
+    marginVertical: 20,
+  },
+  contentStats: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  actionButtons: {
+    marginVertical: 24,
+  },
+  primaryButton: {
+    backgroundColor: '#10B981',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
