@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import * as ImagePicker from 'expo-image-picker';
 import {
   Camera,
   User,
@@ -23,9 +22,9 @@ import {
   HelpCircle,
   Bell,
   Moon,
-  Trash2,
 } from 'lucide-react-native';
 import { uploadProfileImage, deleteProfileImage } from '../../api/profile';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
@@ -33,48 +32,93 @@ export default function ProfileScreen() {
   const [notifications, setNotifications] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
+  const handleImageError = (errorMessage: string) => {
+    console.error(errorMessage);
+    Alert.alert(
+      'Missing Dependency',
+      'To use this feature, you need to install the expo-image-picker package. Run: npx expo install expo-image-picker',
+      [
+        { text: 'OK' },
+        {
+          text: 'Learn More',
+          onPress: () => {
+            // In a real app, you might open a link to documentation
+            Alert.alert(
+              'Installation Instructions',
+              '1. Stop your development server\n' +
+                '2. Run: npx expo install expo-image-picker\n' +
+                '3. Restart your app'
+            );
+          },
+        },
+      ]
+    );
+  };
+
   const pickImage = async () => {
     try {
-      // Request permissions first (for older iOS)
-      if (Platform.OS !== 'web') {
-        const { status } =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert(
-            'Permission Required',
-            'Sorry, we need camera roll permissions to make this work!'
-          );
-          return;
-        }
+      // Check if we're on web, which doesn't need expo-image-picker
+      if (Platform.OS === 'web') {
+        // Web implementation would go here if needed
+        Alert.alert(
+          'Not Implemented',
+          'Image picking on web is not implemented in this version'
+        );
+        return;
       }
 
+      // Request media library permissions
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Sorry, we need camera roll permissions to make this work!'
+        );
+        return;
+      }
+
+      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.7,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setIsLoading(true);
         try {
-          // Upload the image to the server
-          const response = await uploadProfileImage(result.assets[0].uri);
+          // Create FormData object for the image upload
+          const formData = new FormData();
 
-          // Update the user with the new avatar URL from the server response
-          if (response && response.user && response.user.avatar) {
-            updateUser({
-              avatar: { uri: response.user.avatar },
-            });
-          } else {
-            // If no avatar URL is returned, use the local URI temporarily
-            updateUser({
-              avatar: { uri: result.assets[0].uri },
-            });
-          }
+          // Get image info
+          const imageUri = result.assets[0].uri;
+          const filename = imageUri.split('/').pop();
+
+          // Determine mime type (default to jpeg if can't determine)
+          const match = /\.([\w]+)$/.exec(filename || '');
+          const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+          // Append the image to FormData with field name 'image'
+          formData.append('image', {
+            uri: imageUri,
+            name: filename,
+            type,
+          } as any);
+
+          // Upload the image to your backend
+          // console.log('Uploading image:', result.assets);
+          const response = await uploadProfileImage(formData);
+
+          // Update the user state with the new avatar
+          updateUser({ avatar: { uri: result.assets[0].uri } });
+
+          Alert.alert('Success', 'Profile picture updated successfully');
         } catch (uploadError) {
           console.error('Error uploading image:', uploadError);
-          Alert.alert('Upload Failed', 'Failed to upload image to server');
+          Alert.alert('Error', 'Failed to upload profile picture');
         } finally {
           setIsLoading(false);
         }
@@ -87,44 +131,55 @@ export default function ProfileScreen() {
 
   const takePicture = async () => {
     try {
-      // Request permissions first
-      if (Platform.OS !== 'web') {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert(
-            'Permission Required',
-            'Sorry, we need camera permissions to make this work!'
-          );
-          return;
-        }
+      // Request camera permissions
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Sorry, we need camera permissions to make this work!'
+        );
+        return;
       }
 
+      // Launch camera
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.7,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setIsLoading(true);
         try {
-          // Upload the image to the server
-          const response = await uploadProfileImage(result.assets[0].uri);
+          // Create FormData object for the image upload
+          const formData = new FormData();
 
-          // Update the user with the new avatar URL from the server response
-          if (response && response.user && response.user.avatar) {
-            updateUser({
-              avatar: { uri: response.user.avatar },
-            });
-          } else {
-            // If no avatar URL is returned, use the local URI temporarily
-            updateUser({
-              avatar: { uri: result.assets[0].uri },
-            });
-          }
+          // Get image info
+          const imageUri = result.assets[0].uri;
+          const filename = imageUri.split('/').pop();
+
+          // Determine mime type (default to jpeg if can't determine)
+          const match = /\.([\w]+)$/.exec(filename || '');
+          const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+          // Append the image to FormData with field name 'image'
+          formData.append('image', {
+            uri: imageUri,
+            name: filename,
+            type,
+          } as any);
+
+          // Upload the image to your backend
+          const response = await uploadProfileImage(formData);
+
+          // Update the user state with the new avatar
+          updateUser({ avatar: { uri: result.assets[0].uri } });
+
+          Alert.alert('Success', 'Profile picture updated successfully');
         } catch (uploadError) {
           console.error('Error uploading image:', uploadError);
-          Alert.alert('Upload Failed', 'Failed to upload image to server');
+          Alert.alert('Error', 'Failed to upload profile picture');
         } finally {
           setIsLoading(false);
         }

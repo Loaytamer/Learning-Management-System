@@ -2,14 +2,20 @@ const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const cloudinary = require("../config/cloudinary");
 
-// JWT secret key (should be in environment variables in production)
+// Use environment variable for JWT secret (no hardcoded fallback)
 const JWT_SECRET = "your-secret-key";
 
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET is not defined in environment variables");
+}
+
 // Generate JWT Token
-const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, JWT_SECRET, {
-    expiresIn: "30d",
-  });
+const generateToken = (user) => {
+  return jwt.sign(
+    { id: user._id, username: user.username, role: user.role },
+    JWT_SECRET,
+    { expiresIn: '1h' }
+  );
 };
 
 // Register new user
@@ -26,7 +32,7 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create new user
+    // Create new user with default role if not provided
     const user = await User.create({
       username,
       email,
@@ -35,7 +41,7 @@ exports.register = async (req, res) => {
     });
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user);
 
     res.status(201).json({
       success: true,
@@ -79,7 +85,7 @@ exports.login = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user);
 
     res.json({
       success: true,
@@ -103,9 +109,21 @@ exports.login = async (req, res) => {
 exports.getCurrentUser = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
     res.json({
       success: true,
-      user,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        profileImage: user.profileImage,
+      },
     });
   } catch (error) {
     res.status(400).json({
@@ -115,64 +133,114 @@ exports.getCurrentUser = async (req, res) => {
   }
 };
 
+// Upload profile image
 exports.uploadProfileImage = async (req, res) => {
   try {
     const userId = req.user?.id;
-    console.log(userId);
-    const imageUrl = req.file.path;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded",
+      });
+    }
+
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: "user_profiles",
+    });
+
+    const imageUrl = result.secure_url;
 
     // Update user profile image
-    await User.findByIdAndUpdate(userId, { profileImage: imageUrl });
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { profileImage: imageUrl },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
 
     res.status(200).json({
       success: true,
       message: "Image uploaded successfully",
-      imageUrl,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        profileImage: user.profileImage,
+      },
     });
   } catch (error) {
     console.error("Upload Error:", error);
     res.status(500).json({
       success: false,
-      message: "Image upload failed",
+      message: error.message || "Image upload failed",
     });
   }
 };
 
-
+// Delete profile image
 exports.deleteProfileImageController = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const user = await User.findById(userId);
-
+    const user = await User.findById(userId).select("-password");
     if (!user || !user.profileImage) {
-      return res.status(404).json({ message: "User or image not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User or image not found",
+      });
     }
 
     const imageUrl = user.profileImage;
+    const publicId = imageUrl
+      .split("/")
+      .slice(-2)
+      .join("/")
+      .split(".")[0]; // Handles dynamic folder structure
 
-   
-    const parts = imageUrl.split("/");
-    const fileName = parts[parts.length - 1]; // abc123.jpg
-    const folder = parts[parts.length - 2]; // user_profiles
-
-    const public_id = `${folder}/${fileName.split(".")[0]}`; 
-
-    const result = await cloudinary.uploader.destroy(public_id);
+    const result = await cloudinary.uploader.destroy(publicId);
 
     if (result.result !== "ok") {
-      return res
-        .status(400)
-        .json({ message: "Failed to delete image", result });
+      return res.status(400).json({
+        success: false,
+        message: "Failed to delete image",
+        result,
+      });
     }
 
-    
     user.profileImage = null;
     await user.save();
 
-    return res.status(200).json({ message: "Image deleted successfully" });
+    res.status(200).json({
+      success: true,
+      message: "Image deleted successfully",
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        profileImage: user.profileImage,
+      },
+    });
   } catch (error) {
     console.error("Delete error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
   }
 };

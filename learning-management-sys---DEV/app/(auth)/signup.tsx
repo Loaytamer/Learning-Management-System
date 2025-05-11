@@ -205,11 +205,11 @@ export default function SignupScreen() {
             </Link>
           </View>
           
-          <View style={styles.demoNote}>
+          {/* <View style={styles.demoNote}>
             <Text style={styles.demoNoteText}>
               Note: Registration is mocked for demo purposes. Please use the pre-defined credentials on the login screen.
             </Text>
-          </View>
+          </View> */}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

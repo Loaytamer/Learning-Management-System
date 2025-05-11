@@ -12,22 +12,22 @@ const {
 } = require('../controllers/courseController');
 const router = express.Router();
 
-// Public routes
+// Public routes (no authentication required)
 router.get('/', getCourses);
 router.get('/:id', getCourseById);
 
 // Protected routes (require authentication)
 router.use(auth);
 
-// Student routes
+// Student routes (authenticated users)
 router.post('/:id/enroll', enrollInCourse);
 router.post('/:id/unenroll', unenrollFromCourse);
 
 // Instructor routes (require instructor role)
 const isInstructor = require('../middleware/isInstructor');
-router.post('/', createCourse);
-router.put('/:id', updateCourse);
-router.delete('/:id',  deleteCourse);
-router.post('/:id/lessons',  addLesson);
+router.post('/', isInstructor, createCourse);
+router.put('/:id', isInstructor, updateCourse);
+router.delete('/:id', isInstructor, deleteCourse);
+router.post('/:id/lessons', isInstructor, addLesson);
 
 module.exports = router;
