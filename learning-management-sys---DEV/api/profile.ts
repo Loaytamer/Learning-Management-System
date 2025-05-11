@@ -9,7 +9,7 @@ import { getAuthToken } from './auth';
  * @param formData The FormData object containing the profile image and any other data
  * @returns The response from the server with the updated user data
  */
-export const uploadProfileImage = async (formData: FormData) => {
+export const uploadavatar = async (formData: FormData) => {
   try {
     // Get the auth token
     const token = await getAuthToken();
@@ -26,7 +26,7 @@ export const uploadProfileImage = async (formData: FormData) => {
         Authorization: `Bearer ${token}`,
       },
     });
-
+    console.log('Response from server:', response.data);
     return response.data;
   } catch (error: any) {
     console.error('Error uploading profile image:', error);
@@ -44,7 +44,7 @@ export const uploadProfileImage = async (formData: FormData) => {
  * Delete the current profile image
  * @returns The response from the server with the updated user data
  */
-export const deleteProfileImage = async () => {
+export const deleteavatar = async () => {
   try {
     // Get the auth token
     const token = await getAuthToken();
@@ -58,7 +58,7 @@ export const deleteProfileImage = async () => {
         Authorization: `Bearer ${token}`,
       },
     });
-
+    console.log('Response from server:', response.data);
     return response.data;
   } catch (error: any) {
     console.error('Error deleting profile image:', error);

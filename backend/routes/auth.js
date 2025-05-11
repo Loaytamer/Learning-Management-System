@@ -4,8 +4,8 @@ const {
   register,
   login,
   getCurrentUser,
-  uploadProfileImage,
-  deleteProfileImageController,
+  uploadavatar,
+  deleteavatarController,
 } = require("../controllers/authController");
 const auth = require('../middleware/auth');
 const upload  = require("../utils/cloudinaryUploader");
@@ -29,12 +29,12 @@ router.get('/me', auth, getCurrentUser);
 // @desc    Upload profile image
 // @access  Private
 
-router.post('/upload', auth, upload.single('image'), uploadProfileImage);
+router.post('/upload', auth, upload.single('image'), uploadavatar);
 
 // @route   DELETE /api/auth/delete-image
 // @desc    Delete profile image
 // @access  Private
-router.delete("/delete-image", auth, deleteProfileImageController);
+router.delete("/delete-image", auth, deleteavatarController);
 
 
 

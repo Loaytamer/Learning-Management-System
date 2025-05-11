@@ -23,7 +23,7 @@ import {
   Bell,
   Moon,
 } from 'lucide-react-native';
-import { uploadProfileImage, deleteProfileImage } from '../../api/profile';
+import { uploadavatar, deleteavatar } from '../../api/profile';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen() {
@@ -42,7 +42,6 @@ export default function ProfileScreen() {
         {
           text: 'Learn More',
           onPress: () => {
-            // In a real app, you might open a link to documentation
             Alert.alert(
               'Installation Instructions',
               '1. Stop your development server\n' +
@@ -57,29 +56,17 @@ export default function ProfileScreen() {
 
   const pickImage = async () => {
     try {
-      // Check if we're on web, which doesn't need expo-image-picker
       if (Platform.OS === 'web') {
-        // Web implementation would go here if needed
-        Alert.alert(
-          'Not Implemented',
-          'Image picking on web is not implemented in this version'
-        );
+        Alert.alert('Not Implemented', 'Image picking on web is not implemented in this version');
         return;
       }
 
-      // Request media library permissions
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission Required',
-          'Sorry, we need camera roll permissions to make this work!'
-        );
+        Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to make this work!');
         return;
       }
 
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -90,30 +77,23 @@ export default function ProfileScreen() {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setIsLoading(true);
         try {
-          // Create FormData object for the image upload
           const formData = new FormData();
-
-          // Get image info
           const imageUri = result.assets[0].uri;
           const filename = imageUri.split('/').pop();
-
-          // Determine mime type (default to jpeg if can't determine)
           const match = /\.([\w]+)$/.exec(filename || '');
           const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-          // Append the image to FormData with field name 'image'
           formData.append('image', {
             uri: imageUri,
             name: filename,
             type,
           } as any);
 
-          // Upload the image to your backend
-          // console.log('Uploading image:', result.assets);
-          const response = await uploadProfileImage(formData);
+          const response = await uploadavatar(formData);
 
-          // Update the user state with the new avatar
-          updateUser({ avatar: { uri: result.assets[0].uri } });
+          // Use the avatar URL from the response if provided by the backend
+          const newAvatarUri = response?.data?.avatar || result.assets[0].uri;
+          updateUser({ avatar: { uri: newAvatarUri } });
 
           Alert.alert('Success', 'Profile picture updated successfully');
         } catch (uploadError) {
@@ -131,18 +111,12 @@ export default function ProfileScreen() {
 
   const takePicture = async () => {
     try {
-      // Request camera permissions
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission Required',
-          'Sorry, we need camera permissions to make this work!'
-        );
+        Alert.alert('Permission Required', 'Sorry, we need camera permissions to make this work!');
         return;
       }
 
-      // Launch camera
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [1, 1],
@@ -152,29 +126,23 @@ export default function ProfileScreen() {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setIsLoading(true);
         try {
-          // Create FormData object for the image upload
           const formData = new FormData();
-
-          // Get image info
           const imageUri = result.assets[0].uri;
           const filename = imageUri.split('/').pop();
-
-          // Determine mime type (default to jpeg if can't determine)
           const match = /\.([\w]+)$/.exec(filename || '');
           const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-          // Append the image to FormData with field name 'image'
           formData.append('image', {
             uri: imageUri,
             name: filename,
             type,
           } as any);
 
-          // Upload the image to your backend
-          const response = await uploadProfileImage(formData);
+          const response = await uploadavatar(formData);
 
-          // Update the user state with the new avatar
-          updateUser({ avatar: { uri: result.assets[0].uri } });
+          // Use the avatar URL from the response if provided by the backend
+          const newAvatarUri = response?.data?.avatar || result.assets[0].uri;
+          updateUser({ avatar: { uri: newAvatarUri } });
 
           Alert.alert('Success', 'Profile picture updated successfully');
         } catch (uploadError) {
@@ -193,12 +161,8 @@ export default function ProfileScreen() {
   const deleteImage = async () => {
     try {
       setIsLoading(true);
-      // Call the API to delete the image
-      const response = await deleteProfileImage();
-
-      // Update the user state to remove the avatar
+      await deleteavatar();
       updateUser({ avatar: undefined });
-
       Alert.alert('Success', 'Profile picture deleted successfully');
     } catch (error) {
       console.error('Error deleting image:', error);
@@ -208,7 +172,6 @@ export default function ProfileScreen() {
     }
   };
 
-  // Define interface for alert options to include style property
   interface AlertOption {
     text: string;
     onPress?: () => Promise<void> | void;
@@ -217,18 +180,15 @@ export default function ProfileScreen() {
 
   const showImageOptions = () => {
     if (Platform.OS === 'web') {
-      // Web doesn't support ActionSheet, so just launch picker directly
       pickImage();
       return;
     }
 
-    // Create base options array
     const options: AlertOption[] = [
       { text: 'Take Photo', onPress: takePicture },
       { text: 'Choose from Gallery', onPress: pickImage },
     ];
 
-    // Add delete option only if user has an avatar
     if (user?.avatar) {
       options.push({
         text: 'Delete Current Photo',
@@ -237,7 +197,6 @@ export default function ProfileScreen() {
       });
     }
 
-    // Always add cancel option at the end
     options.push({ text: 'Cancel', style: 'cancel' });
 
     Alert.alert('Profile Picture', 'Choose an option', options, {
@@ -247,12 +206,10 @@ export default function ProfileScreen() {
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
-    // In a real app, this would update the app theme
   };
 
   const toggleNotifications = () => {
     setNotifications(!notifications);
-    // In a real app, this would update notification settings
   };
 
   const handleLogout = () => {
@@ -261,11 +218,7 @@ export default function ProfileScreen() {
       'Are you sure you want to logout?',
       [
         { text: 'Cancel', style: 'cancel' } as AlertOption,
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => logout(),
-        } as AlertOption,
+        { text: 'Logout', style: 'destructive', onPress: () => logout() } as AlertOption,
       ],
       { cancelable: true }
     );
@@ -312,13 +265,11 @@ export default function ProfileScreen() {
 
       <View style={styles.infoSection}>
         <Text style={styles.sectionTitle}>Personal Information</Text>
-
         <TouchableOpacity style={styles.infoItem}>
           <User size={20} color="#9CA3AF" />
           <Text style={styles.infoText}>Edit Profile</Text>
           <ChevronRight size={20} color="#9CA3AF" style={styles.chevron} />
         </TouchableOpacity>
-
         <TouchableOpacity style={styles.infoItem}>
           <Edit size={20} color="#9CA3AF" />
           <Text style={styles.infoText}>Edit Bio</Text>
@@ -328,7 +279,6 @@ export default function ProfileScreen() {
 
       <View style={styles.settingsSection}>
         <Text style={styles.sectionTitle}>Settings</Text>
-
         <View style={styles.settingItem}>
           <View style={styles.settingLeft}>
             <Moon size={20} color="#9CA3AF" />
@@ -341,7 +291,6 @@ export default function ProfileScreen() {
             thumbColor={darkMode ? '#FFFFFF' : '#D1D5DB'}
           />
         </View>
-
         <View style={styles.settingItem}>
           <View style={styles.settingLeft}>
             <Bell size={20} color="#9CA3AF" />
@@ -354,7 +303,6 @@ export default function ProfileScreen() {
             thumbColor={notifications ? '#FFFFFF' : '#D1D5DB'}
           />
         </View>
-
         <TouchableOpacity style={styles.settingItem}>
           <View style={styles.settingLeft}>
             <Settings size={20} color="#9CA3AF" />
@@ -362,7 +310,6 @@ export default function ProfileScreen() {
           </View>
           <ChevronRight size={20} color="#9CA3AF" />
         </TouchableOpacity>
-
         <TouchableOpacity style={styles.settingItem}>
           <View style={styles.settingLeft}>
             <HelpCircle size={20} color="#9CA3AF" />

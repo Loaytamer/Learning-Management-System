@@ -95,6 +95,7 @@ exports.login = async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        avatar: user.avatar,
       },
     });
   } catch (error) {
@@ -115,6 +116,9 @@ exports.getCurrentUser = async (req, res) => {
         message: "User not found",
       });
     }
+
+    console.log("GetCurrentUser - User from DB with avatar:", user.avatar); // Debug log
+
     res.json({
       success: true,
       user: {
@@ -122,10 +126,13 @@ exports.getCurrentUser = async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        profileImage: user.profileImage,
+        avatar: user.avatar || undefined,
+        enrolledCourses: user.enrolledCourses || [],
+        createdCourses: user.createdCourses || [],
       },
     });
   } catch (error) {
+    console.error("Get current user error:", error);
     res.status(400).json({
       success: false,
       message: error.message,
@@ -134,19 +141,32 @@ exports.getCurrentUser = async (req, res) => {
 };
 
 // Upload profile image
-exports.uploadProfileImage = async (req, res) => {
+exports.uploadavatar = async (req, res) => {
   try {
     const userId = req.user?.id;
     console.log(userId);
     const imageUrl = req.file.path;
 
     // Update user profile image
-    await User.findByIdAndUpdate(userId, { profileImage: imageUrl });
+    const user = await User.findByIdAndUpdate(userId, { avatar: imageUrl });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
 
     res.status(200).json({
       success: true,
       message: "Image uploaded successfully",
-      imageUrl,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+      },
     });
   } catch (error) {
     console.error("Upload Error:", error);
@@ -158,24 +178,24 @@ exports.uploadProfileImage = async (req, res) => {
 };
 
 
-exports.deleteProfileImageController = async (req, res) => {
+exports.deleteavatarController = async (req, res) => {
   try {
     const userId = req.user.id;
 
     const user = await User.findById(userId);
 
-    if (!user || !user.profileImage) {
+    if (!user || !user.avatar) {
       return res.status(404).json({ message: "User or image not found" });
     }
 
-    const imageUrl = user.profileImage;
+    const imageUrl = user.avatar;
 
-   
+
     const parts = imageUrl.split("/");
     const fileName = parts[parts.length - 1]; // abc123.jpg
     const folder = parts[parts.length - 2]; // user_profiles
 
-    const public_id = `${folder}/${fileName.split(".")[0]}`; 
+    const public_id = `${folder}/${fileName.split(".")[0]}`;
 
     const result = await cloudinary.uploader.destroy(public_id);
 
@@ -185,11 +205,20 @@ exports.deleteProfileImageController = async (req, res) => {
         .json({ message: "Failed to delete image", result });
     }
 
-    
-    user.profileImage = null;
+
+    user.avatar = undefined;
     await user.save();
 
-    return res.status(200).json({ message: "Image deleted successfully" });
+    res.status(200).json({
+      message: "Image deleted successfully",
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+      },
+    });
   } catch (error) {
     console.error("Delete error:", error);
     return res.status(500).json({ message: "Internal server error" });
