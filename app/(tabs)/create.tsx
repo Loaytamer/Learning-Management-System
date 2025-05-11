@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useCourses } from '../../contexts/CourseContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { UploadCloud, BookOpen, Info, Plus } from 'lucide-react-native';
+import * as courseAPI from '../../api/courses';
 
 export default function CreateCourseScreen() {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function CreateCourseScreen() {
     );
   }
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     // Validate required fields
     if (!title || !description || !category || !level || !thumbnail || !price || !duration) {
       Alert.alert('Missing Fields', 'Please fill in all required fields');
@@ -42,7 +43,7 @@ export default function CreateCourseScreen() {
     setIsSubmitting(true);
 
     try {
-      const newCourse = createCourse({
+      const courseData = {
         title,
         description,
         category,
@@ -53,7 +54,10 @@ export default function CreateCourseScreen() {
         lessons: [],
         rating: 0,
         reviews: 0,
-      });
+      };
+
+      const newCourse = await courseAPI.createCourse(courseData);
+      createCourse(courseData);
 
       setIsSubmitting(false);
       Alert.alert(

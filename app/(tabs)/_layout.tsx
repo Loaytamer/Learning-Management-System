@@ -25,13 +25,42 @@ export default function TabLayout() {
       tabBar={props => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: '#6200EE',
+        tabBarInactiveTintColor: '#9CA3AF'
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="courses" options={{ title: 'Courses' }} />
-      {isInstructor && <Tabs.Screen name="create" options={{ title: 'Create' }} />}
-      <Tabs.Screen name="notifications" options={{ title: 'Notifications' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      <Tabs.Screen 
+        name="index" 
+        options={{ 
+          title: 'Home'
+        }} 
+      />
+      <Tabs.Screen 
+        name="courses" 
+        options={{ 
+          title: 'Courses'
+        }} 
+      />
+      <Tabs.Screen 
+        name="create" 
+        options={{ 
+          title: 'Create',
+          href: isInstructor ? null : null
+        }} 
+      />
+      <Tabs.Screen 
+        name="notifications" 
+        options={{ 
+          title: 'Notifications'
+        }} 
+      />
+      <Tabs.Screen 
+        name="profile" 
+        options={{ 
+          title: 'Profile'
+        }} 
+      />
     </Tabs>
   );
 }

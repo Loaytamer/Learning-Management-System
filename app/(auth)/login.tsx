@@ -28,11 +28,12 @@ export default function LoginScreen() {
       if (success) {
         router.replace('/');
       } else {
-        setError('Invalid email or password. Try using student1@example.com / 123456 or instructor1@example.com / 123456');
+        setError('Invalid email or password. Please check your credentials and try again.');
       }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
-      console.error(err);
+    } catch (err: any) {
+      const errorMessage = err.message || 'An error occurred during login. Please try again.';
+      setError(errorMessage);
+      console.error('Login error:', err);
     } finally {
       setIsSubmitting(false);
     }

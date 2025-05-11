@@ -75,7 +75,7 @@ export default function HomeScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Hello, {user?.name.split(' ')[0]}</Text>
+            <Text style={styles.greeting}>Hello, {user?.username?.split(' ')[0] || 'User'}</Text>
             <Text style={styles.subGreeting}>
               {isInstructor ? 'Manage your courses' : 'Let\'s continue learning'}
             </Text>

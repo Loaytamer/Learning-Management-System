@@ -136,7 +136,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ...courseData,
       id: `course${courses.length + 1}`,
       instructor: user.id,
-      instructorName: user.name,
+      instructorName: user.username,
       enrolledStudents: [],
       createdAt: new Date(),
       updatedAt: new Date(),

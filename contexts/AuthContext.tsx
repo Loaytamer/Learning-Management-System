@@ -1,6 +1,17 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { router } from 'expo-router';
-import MOCK_USERS, { User, Role } from '../data/users';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as authApi from '../api/auth';
+
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  role: 'student' | 'instructor';
+  avatar?: { uri: string };
+  enrolledCourses: string[];
+  createdCourses: string[];
+}
 
 interface AuthContextProps {
   user: User | null;
@@ -26,19 +37,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for stored user on startup
+  // Check for stored user and token on startup
   useEffect(() => {
     const checkStoredUser = async () => {
       try {
-        // Simulate getting stored user from AsyncStorage
-        // In a real app, this would be: const storedUser = await AsyncStorage.getItem('user');
-        
-        // Simulating a delay for fetching stored user
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 1000);
+        const [storedUser, token] = await Promise.all([
+          AsyncStorage.getItem('user'),
+          AsyncStorage.getItem('token')
+        ]);
+
+        if (storedUser && token) {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+        }
       } catch (error) {
         console.error('Error retrieving stored user:', error);
+      } finally {
         setIsLoading(false);
       }
     };
@@ -48,37 +62,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await authApi.login({ email, password });
       
-      const foundUser = MOCK_USERS.find(
-        u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-      );
-      
-      if (foundUser) {
-        setUser(foundUser);
-        // In a real app: await AsyncStorage.setItem('user', JSON.stringify(foundUser));
-        return true;
+      if (response && response.success) {
+        const { user: userData, token } = response;
+        if (userData && token) {
+          setUser(userData as User);
+          await Promise.all([
+            AsyncStorage.setItem('user', JSON.stringify(userData)),
+            AsyncStorage.setItem('token', token)
+          ]);
+          return true;
+        }
       }
-      
       return false;
-    } catch (error) {
-      console.error('Login error:', error);
-      return false;
+    } catch (error: any) {
+      const errorMessage = error.message || 'An unexpected error occurred';
+      console.error('Login error:', errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     setUser(null);
-    // In a real app: await AsyncStorage.removeItem('user');
+    await Promise.all([
+      AsyncStorage.removeItem('user'),
+      AsyncStorage.removeItem('token')
+    ]);
     router.replace('/login');
   };
 
-  const updateUser = (userData: Partial<User>) => {
+  const updateUser = async (userData: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...userData };
       setUser(updatedUser);
-      // In a real app: await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
     }
   };
 
