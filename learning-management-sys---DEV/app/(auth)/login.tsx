@@ -134,11 +134,11 @@ export default function LoginScreen() {
             </Link>
           </View>
           
-          <View style={styles.demoCredentials}>
+          {/* <View style={styles.demoCredentials}>
             <Text style={styles.demoTitle}>Demo Credentials</Text>
             <Text style={styles.demoText}>Student: student1@example.com / 123456</Text>
             <Text style={styles.demoText}>Instructor: instructor1@example.com / 123456</Text>
-          </View>
+          </View> */}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

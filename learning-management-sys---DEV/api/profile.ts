@@ -6,10 +6,10 @@ const API_URL = 'http://192.168.1.6:5000/api/auth'; // Loay
 
 /**
  * Upload profile image to the server
- * @param imageUri The local URI of the image to upload
+ * @param formData The FormData object containing the profile image and any other data
  * @returns The response from the server with the updated user data
  */
-export const uploadProfileImage = async (imageUri: string) => {
+export const uploadProfileImage = async (formData: FormData) => {
   try {
     // Get the auth token
     const token = await getAuthToken();
@@ -17,19 +17,7 @@ export const uploadProfileImage = async (imageUri: string) => {
       throw new Error('Authentication token not found');
     }
 
-    // Create form data for the image upload
-    const formData = new FormData();
-
-    // Get the filename from the URI
-    const uriParts = imageUri.split('/');
-    const fileName = uriParts[uriParts.length - 1];
-
-    // Append the image to the form data
-    formData.append('profileImage', {
-      uri: imageUri,
-      name: fileName,
-      type: 'image/jpeg', // Assuming JPEG format, adjust if needed
-    } as any);
+    // No need to create form data as it's now passed as a parameter
 
     // Send the request to the server
     const response = await axios.post(`${API_URL}/upload`, formData, {
