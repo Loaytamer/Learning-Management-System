@@ -77,8 +77,12 @@ exports.login = async (req, res) => {
             });
         }
 
-        // Generate token
-        const token = generateToken(user._id);
+        // Generate token with id and username
+        const token = jwt.sign(
+            { id: user._id, username: user.username },
+            JWT_SECRET,
+            { expiresIn: '1h' }
+        );
 
         res.json({
             success: true,

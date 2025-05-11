@@ -23,11 +23,12 @@ exports.getCourseById = async (req, res) => {
 
 exports.createCourse = async (req, res) => {
   try {
-    const userId = req.user?._id;
+    const userId = req.user.id;
+    console.log("user:" , req.user);
     const courseData = {
       ...req.body,
-      instructor: userId,
-      instructorName: req.user?.username,
+      instructor: userId || 'Unknown',
+      instructorName: req.user.username || 'Unknown',
     };
 
     const course = new Course(courseData);
