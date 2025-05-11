@@ -4,6 +4,11 @@ import { getAuthToken } from './auth';
 
 // const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.8.115:5000/api';
 
+// Validate URL to prevent empty URI issues
+if (!API_URL) {
+  throw new Error('API URL is not configured');
+}
+
 const api = axios.create({
   baseURL: `${API_URL}/courses`,
 });
@@ -90,12 +95,27 @@ export const enrollInCourse = async (id: string): Promise<boolean> => {
   try {
     if (!id) throw new Error('Course ID is required');
 
-    const response = await api.post(`/${id}/enroll`).catch(error => {
+    // First verify the course exists
+    const course = await getCourseById(id).catch(() => null);
+    if (!course) {
+      throw new Error('Course not found or is no longer available');
+    }
+
+    const response = await api.post(`/${id}/enroll`, {}, {
+      timeout: 10000, // 10 second timeout
+      validateStatus: (status) => status === 200 || status === 400 // Accept 400 for validation errors
+    }).catch(error => {
       if (error.code === 'ECONNABORTED') {
         throw new Error('Connection timeout - please try again');
       }
       if (!error.response) {
         throw new Error('Network error - please check your connection');
+      }
+      if (error.response.status === 400) {
+        throw new Error(error.response.data.message || 'Invalid enrollment request');
+      }
+      if (error.response.status === 500) {
+        throw new Error('Server error - please try again later');
       }
       throw error;
     });
