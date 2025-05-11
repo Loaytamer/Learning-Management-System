@@ -1,26 +1,49 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity, ScrollView, FlatList, StatusBar, Alert, Modal, TextInput, Platform } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  FlatList,
+  StatusBar,
+  Alert,
+  Modal,
+  TextInput,
+  Platform,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCourses } from '../../contexts/CourseContext';
-import { ArrowLeft, Clock, Users, Star, Play, DollarSign, Plus, X, Upload } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Clock,
+  Users,
+  Star,
+  Play,
+  DollarSign,
+  Plus,
+  X,
+  Upload,
+} from 'lucide-react-native';
 import LessonCard from '../../components/ui/LessonCard';
 import { Lesson } from '../../data/courses';
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const { 
-    getCourse, 
-    enrollInCourse, 
-    instructorCourses, 
+  const {
+    getCourse,
+    enrollInCourse,
+    instructorCourses,
     enrolledCourses,
-    addLesson
+    addLesson,
   } = useCourses();
   const router = useRouter();
-  
+
   const course = getCourse(id);
-  const isEnrolled = course && enrolledCourses.some(c => c.id === course.id);
+  const isEnrolled = course && enrolledCourses.some((c) => c.id === course.id);
   const isInstructor = user && user.role === 'instructor';
   const isOwner = isInstructor && course && course.instructor === user.id;
 
@@ -34,9 +57,9 @@ export default function CourseDetailScreen() {
     return (
       <View style={styles.notFoundContainer}>
         <Text style={styles.notFoundText}>Course not found</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => router.push('/(tabs)/courses')}
         >
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
@@ -84,7 +107,12 @@ export default function CourseDetailScreen() {
   };
 
   const submitNewLesson = () => {
-    if (!newLessonTitle || !newLessonDescription || !newLessonDuration || !newLessonVideoUrl) {
+    if (
+      !newLessonTitle ||
+      !newLessonDescription ||
+      !newLessonDuration ||
+      !newLessonVideoUrl
+    ) {
       Alert.alert('Missing Fields', 'Please fill in all fields');
       return;
     }
@@ -111,20 +139,17 @@ export default function CourseDetailScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Image 
-          source={{ uri: course.thumbnail }} 
-          style={styles.thumbnail}
-        />
-        
-        <TouchableOpacity 
+        <Image source={{ uri: course.thumbnail }} style={styles.thumbnail} />
+
+        <TouchableOpacity
           style={styles.backButtonContainer}
-          onPress={() => router.back()}
+          onPress={() => router.push('/(tabs)/courses')}
         >
           <ArrowLeft size={20} color="#FFFFFF" />
         </TouchableOpacity>
-        
+
         <View style={styles.content}>
           <View style={styles.categoryContainer}>
             <Text style={styles.category}>{course.category}</Text>
@@ -132,13 +157,15 @@ export default function CourseDetailScreen() {
               <Text style={styles.levelText}>{course.level}</Text>
             </View>
           </View>
-          
+
           <Text style={styles.title}>{course.title}</Text>
-          
+
           <View style={styles.instructorRow}>
-            <Text style={styles.instructorText}>By {course.instructorName}</Text>
+            <Text style={styles.instructorText}>
+              By {course.instructorName}
+            </Text>
           </View>
-          
+
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Clock size={16} color="#9CA3AF" />
@@ -146,33 +173,37 @@ export default function CourseDetailScreen() {
             </View>
             <View style={styles.statItem}>
               <Users size={16} color="#9CA3AF" />
-              <Text style={styles.statText}>{course.enrolledStudents.length} students</Text>
+              <Text style={styles.statText}>
+                {course.enrolledStudents.length} students
+              </Text>
             </View>
             <View style={styles.statItem}>
               <Star size={16} color="#F59E0B" />
-              <Text style={styles.statText}>{course.rating.toFixed(1)} ({course.reviews})</Text>
+              <Text style={styles.statText}>
+                {course.rating.toFixed(1)} ({course.reviews})
+              </Text>
             </View>
           </View>
-          
+
           <View style={styles.divider} />
-          
+
           <View style={styles.priceSection}>
             <View style={styles.priceContainer}>
               <DollarSign size={18} color="#F9FAFB" />
               <Text style={styles.price}>{course.price.toFixed(2)}</Text>
             </View>
-            
+
             {!isEnrolled && !isOwner && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.enrollButton}
                 onPress={handleEnroll}
               >
                 <Text style={styles.enrollButtonText}>Enroll Now</Text>
               </TouchableOpacity>
             )}
-            
+
             {isEnrolled && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.startLearningButton}
                 onPress={handleStartLearning}
               >
@@ -181,16 +212,16 @@ export default function CourseDetailScreen() {
               </TouchableOpacity>
             )}
           </View>
-          
+
           <View style={styles.divider} />
-          
+
           <Text style={styles.sectionTitle}>About this course</Text>
           <Text style={styles.description}>{course.description}</Text>
-          
+
           <View style={styles.lessonsHeader}>
             <Text style={styles.sectionTitle}>Lessons</Text>
             {isOwner && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.addLessonButton}
                 onPress={handleAddLesson}
               >
@@ -199,7 +230,7 @@ export default function CourseDetailScreen() {
               </TouchableOpacity>
             )}
           </View>
-          
+
           {course.lessons.length > 0 ? (
             course.lessons.map((lesson, index) => (
               <LessonCard
@@ -213,7 +244,7 @@ export default function CourseDetailScreen() {
           ) : (
             <View style={styles.emptyLessons}>
               <Text style={styles.emptyLessonsText}>
-                {isOwner 
+                {isOwner
                   ? 'No lessons yet. Add your first lesson!'
                   : 'No lessons available for this course yet.'}
               </Text>
@@ -221,7 +252,7 @@ export default function CourseDetailScreen() {
           )}
         </View>
       </ScrollView>
-      
+
       <Modal
         visible={isAddLessonModalVisible}
         animationType="slide"
@@ -232,11 +263,13 @@ export default function CourseDetailScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add New Lesson</Text>
-              <TouchableOpacity onPress={() => setIsAddLessonModalVisible(false)}>
+              <TouchableOpacity
+                onPress={() => setIsAddLessonModalVisible(false)}
+              >
                 <X size={24} color="#D1D5DB" />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.modalForm}>
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Lesson Title *</Text>
@@ -248,7 +281,7 @@ export default function CourseDetailScreen() {
                   onChangeText={setNewLessonTitle}
                 />
               </View>
-              
+
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Description *</Text>
                 <TextInput
@@ -262,7 +295,7 @@ export default function CourseDetailScreen() {
                   textAlignVertical="top"
                 />
               </View>
-              
+
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Duration (minutes) *</Text>
                 <TextInput
@@ -274,7 +307,7 @@ export default function CourseDetailScreen() {
                   keyboardType="number-pad"
                 />
               </View>
-              
+
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Video URL *</Text>
                 <TextInput
@@ -288,7 +321,7 @@ export default function CourseDetailScreen() {
                   This would be a VideoCipher URL in a real application
                 </Text>
               </View>
-              
+
               <TouchableOpacity
                 style={styles.addButton}
                 onPress={submitNewLesson}
