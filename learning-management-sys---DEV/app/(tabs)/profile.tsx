@@ -1,21 +1,49 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity, Switch, Alert, ScrollView, Platform } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  Switch,
+  Alert,
+  ScrollView,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, User, LogOut, ChevronRight, Edit, Settings, HelpCircle, Bell, Moon } from 'lucide-react-native';
+import {
+  Camera,
+  User,
+  LogOut,
+  ChevronRight,
+  Edit,
+  Settings,
+  HelpCircle,
+  Bell,
+  Moon,
+  Trash2,
+} from 'lucide-react-native';
+import { uploadProfileImage, deleteProfileImage } from '../../api/profile';
 
 export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
   const [darkMode, setDarkMode] = useState(true);
   const [notifications, setNotifications] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   const pickImage = async () => {
     try {
       // Request permissions first (for older iOS)
       if (Platform.OS !== 'web') {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to make this work!');
+          Alert.alert(
+            'Permission Required',
+            'Sorry, we need camera roll permissions to make this work!'
+          );
           return;
         }
       }
@@ -28,9 +56,28 @@ export default function ProfileScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        updateUser({ 
-          avatar: { uri: result.assets[0].uri } 
-        });
+        setIsLoading(true);
+        try {
+          // Upload the image to the server
+          const response = await uploadProfileImage(result.assets[0].uri);
+
+          // Update the user with the new avatar URL from the server response
+          if (response && response.user && response.user.avatar) {
+            updateUser({
+              avatar: { uri: response.user.avatar },
+            });
+          } else {
+            // If no avatar URL is returned, use the local URI temporarily
+            updateUser({
+              avatar: { uri: result.assets[0].uri },
+            });
+          }
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          Alert.alert('Upload Failed', 'Failed to upload image to server');
+        } finally {
+          setIsLoading(false);
+        }
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -44,7 +91,10 @@ export default function ProfileScreen() {
       if (Platform.OS !== 'web') {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission Required', 'Sorry, we need camera permissions to make this work!');
+          Alert.alert(
+            'Permission Required',
+            'Sorry, we need camera permissions to make this work!'
+          );
           return;
         }
       }
@@ -56,15 +106,59 @@ export default function ProfileScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        updateUser({ 
-          avatar: { uri: result.assets[0].uri } 
-        });
+        setIsLoading(true);
+        try {
+          // Upload the image to the server
+          const response = await uploadProfileImage(result.assets[0].uri);
+
+          // Update the user with the new avatar URL from the server response
+          if (response && response.user && response.user.avatar) {
+            updateUser({
+              avatar: { uri: response.user.avatar },
+            });
+          } else {
+            // If no avatar URL is returned, use the local URI temporarily
+            updateUser({
+              avatar: { uri: result.assets[0].uri },
+            });
+          }
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          Alert.alert('Upload Failed', 'Failed to upload image to server');
+        } finally {
+          setIsLoading(false);
+        }
       }
     } catch (error) {
       console.error('Error taking picture:', error);
       Alert.alert('Error', 'Failed to take picture');
     }
   };
+
+  const deleteImage = async () => {
+    try {
+      setIsLoading(true);
+      // Call the API to delete the image
+      const response = await deleteProfileImage();
+
+      // Update the user state to remove the avatar
+      updateUser({ avatar: undefined });
+
+      Alert.alert('Success', 'Profile picture deleted successfully');
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      Alert.alert('Error', 'Failed to delete profile picture');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Define interface for alert options to include style property
+  interface AlertOption {
+    text: string;
+    onPress?: () => Promise<void> | void;
+    style?: 'default' | 'cancel' | 'destructive';
+  }
 
   const showImageOptions = () => {
     if (Platform.OS === 'web') {
@@ -73,16 +167,27 @@ export default function ProfileScreen() {
       return;
     }
 
-    Alert.alert(
-      'Change Profile Picture',
-      'Choose an option',
-      [
-        { text: 'Take Photo', onPress: takePicture },
-        { text: 'Choose from Library', onPress: pickImage },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-      { cancelable: true }
-    );
+    // Create base options array
+    const options: AlertOption[] = [
+      { text: 'Take Photo', onPress: takePicture },
+      { text: 'Choose from Gallery', onPress: pickImage },
+    ];
+
+    // Add delete option only if user has an avatar
+    if (user?.avatar) {
+      options.push({
+        text: 'Delete Current Photo',
+        onPress: deleteImage,
+        style: 'destructive',
+      });
+    }
+
+    // Always add cancel option at the end
+    options.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert('Profile Picture', 'Choose an option', options, {
+      cancelable: true,
+    });
   };
 
   const toggleDarkMode = () => {
@@ -100,8 +205,12 @@ export default function ProfileScreen() {
       'Logout',
       'Are you sure you want to logout?',
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: () => logout() },
+        { text: 'Cancel', style: 'cancel' } as AlertOption,
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: () => logout(),
+        } as AlertOption,
       ],
       { cancelable: true }
     );
@@ -117,7 +226,11 @@ export default function ProfileScreen() {
 
       <View style={styles.profileSection}>
         <View style={styles.avatarContainer}>
-          {user.avatar ? (
+          {isLoading ? (
+            <View style={[styles.avatar, styles.loadingContainer]}>
+              <ActivityIndicator size="large" color="#6200EE" />
+            </View>
+          ) : user.avatar ? (
             <Image source={user.avatar} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
@@ -127,12 +240,13 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.editAvatarButton}
             onPress={showImageOptions}
+            disabled={isLoading}
           >
             <Camera size={16} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.userName}>{user.name}</Text>
+        <Text style={styles.userName}>{user.username}</Text>
         <Text style={styles.userEmail}>{user.email}</Text>
         <View style={styles.roleBadge}>
           <Text style={styles.roleText}>
@@ -143,13 +257,13 @@ export default function ProfileScreen() {
 
       <View style={styles.infoSection}>
         <Text style={styles.sectionTitle}>Personal Information</Text>
-        
+
         <TouchableOpacity style={styles.infoItem}>
           <User size={20} color="#9CA3AF" />
           <Text style={styles.infoText}>Edit Profile</Text>
           <ChevronRight size={20} color="#9CA3AF" style={styles.chevron} />
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.infoItem}>
           <Edit size={20} color="#9CA3AF" />
           <Text style={styles.infoText}>Edit Bio</Text>
@@ -159,7 +273,7 @@ export default function ProfileScreen() {
 
       <View style={styles.settingsSection}>
         <Text style={styles.sectionTitle}>Settings</Text>
-        
+
         <View style={styles.settingItem}>
           <View style={styles.settingLeft}>
             <Moon size={20} color="#9CA3AF" />
@@ -172,7 +286,7 @@ export default function ProfileScreen() {
             thumbColor={darkMode ? '#FFFFFF' : '#D1D5DB'}
           />
         </View>
-        
+
         <View style={styles.settingItem}>
           <View style={styles.settingLeft}>
             <Bell size={20} color="#9CA3AF" />
@@ -185,7 +299,7 @@ export default function ProfileScreen() {
             thumbColor={notifications ? '#FFFFFF' : '#D1D5DB'}
           />
         </View>
-        
+
         <TouchableOpacity style={styles.settingItem}>
           <View style={styles.settingLeft}>
             <Settings size={20} color="#9CA3AF" />
@@ -193,7 +307,7 @@ export default function ProfileScreen() {
           </View>
           <ChevronRight size={20} color="#9CA3AF" />
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.settingItem}>
           <View style={styles.settingLeft}>
             <HelpCircle size={20} color="#9CA3AF" />
@@ -214,6 +328,11 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1F2937',
+  },
   container: {
     flex: 1,
     backgroundColor: '#111827',
