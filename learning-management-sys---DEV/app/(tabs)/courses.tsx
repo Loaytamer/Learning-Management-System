@@ -32,8 +32,8 @@ export default function CoursesScreen() {
     return matchesSearch && matchesCategory && matchesLevel;
   });
 
-  const handleEnroll = (courseId: string) => {
-    enrollInCourse(courseId);
+  const handleEnroll = async (courseId: string): Promise<boolean> => {
+    return enrollInCourse(courseId);
   };
 
   const resetFilters = () => {
