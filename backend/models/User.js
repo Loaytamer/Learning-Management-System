@@ -35,6 +35,9 @@ const userSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Course'
     }],
+    profileImage: {
+        type: String
+    },
     createdAt: {
         type: Date,
         default: Date.now
