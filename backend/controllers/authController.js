@@ -6,9 +6,11 @@ const JWT_SECRET = 'your-secret-key';
 
 // Generate JWT Token
 const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, JWT_SECRET, {
-        expiresIn: '30d'
-    });
+    const token = jwt.sign(
+        { id: user._id, username: user.username },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+    );
 };
 
 // Register new user
