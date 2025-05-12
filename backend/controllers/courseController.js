@@ -1,6 +1,19 @@
-const { console } = require('inspector');
+const mongoose = require('mongoose');
+
 const { Course } = require('../models/Course');
-const { User } = require('../models/User');
+const User  = require('../models/User');
+
+// Debug logging to confirm models are loaded
+console.log('Course model loaded:', Course ? 'Yes' : 'No');
+console.log('User model loaded:', User ? 'Yes' : 'No');
+
+// Throw an error if models are not defined (this will crash the server at startup if there's an issue)
+if (!Course) {
+  throw new Error('Course model is not defined. Check the export in models/Course.js');
+}
+if (!User) {
+  throw new Error('User model is not defined. Check the export in models/User.js');
+}
 
 exports.getCourses = async (req, res) => {
   try {
@@ -87,41 +100,77 @@ exports.deleteCourse = async (req, res) => {
 };
 
 exports.enrollInCourse = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const userId = req.user.id;
     const courseId = req.params.id;
 
-    const course = await Course.findById(courseId);
+    // Find the course
+    const course = await Course.findById(courseId).session(session);
     if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ success: false, message: 'Course not found' });
     }
 
-    // Check if already enrolled
+    // Check if already enrolled in the course
     if (course.enrolledStudents.includes(userId)) {
-      return res.status(400).json({ message: 'Already enrolled in this course' });
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: 'Already enrolled in this course' });
     }
 
-    // Add student to course
-    course.enrolledStudents.push(userId);
-    await course.save();
-
-    // Add course to user's enrolled courses
-    const user = await User.findById(userId);
+    // Find the user
+    const user = await User.findById(userId).session(session);
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    if (!user.enrolledCourses.includes(courseId)) {
-      user.enrolledCourses.push(courseId);
-      await user.save();
+    // Check if the course is already in user's enrolledCourses (consistency check)
+    if (user.enrolledCourses.includes(courseId)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: 'Course already in user\'s enrolled courses' });
     }
 
-    res.json(true); // Frontend expects boolean
+    // Update course: add user to enrolledStudents
+    course.enrolledStudents.push(userId);
+    await course.save({ session });
+
+    // Update user: add course to enrolledCourses
+    user.enrolledCourses.push(courseId);
+    await user.save({ session });
+
+    // Commit the transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    // Return success response with updated user data
+    res.status(200).json({
+      success: true,
+      message: 'Enrolled in course successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || undefined,
+        enrolledCourses: user.enrolledCourses,
+        createdCourses: user.createdCourses || [],
+      },
+    });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error('Enrollment error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
+      success: false,
       message: 'Error enrolling in course',
-      error: error.message 
+      error: error.message,
     });
   }
 };
