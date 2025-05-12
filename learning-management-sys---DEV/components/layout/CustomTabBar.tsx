@@ -1,17 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import {
-  Book,
-  Home,
-  Bell,
-  User,
-  PlusCircle,
-} from 'lucide-react-native';
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
+import { Book, Home, Bell, User, PlusCircle } from 'lucide-react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 // import { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
-
 
 const CustomTabBar: React.FC<BottomTabBarProps> = ({
   state,
@@ -27,15 +26,15 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({
     const size = 24;
 
     switch (routeName) {
-      case 'Home':
+      case 'index':
         return <Home size={size} color={color} />;
-      case 'Courses':
+      case 'courses':
         return <Book size={size} color={color} />;
-      case 'Create':
+      case 'create':
         return <PlusCircle size={size} color={color} />;
-      case 'Notifications':
+      case 'notifications':
         return <Bell size={size} color={color} />;
-      case 'Profile':
+      case 'profile':
         return <User size={size} color={color} />;
       default:
         return <Home size={size} color={color} />;
@@ -50,7 +49,7 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({
         const isFocused = state.index === index;
 
         // Skip the Create tab for students
-        if (route.name === 'Create' && !isInstructor) {
+        if (route.name === 'create' && !isInstructor) {
           return null;
         }
 
@@ -79,7 +78,7 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({
           >
             <View style={styles.iconContainer}>
               {getIcon(route.name, isFocused)}
-              {route.name === 'Notifications' && unreadCount > 0 && (
+              {route.name === 'notifications' && unreadCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
                     {unreadCount > 9 ? '9+' : unreadCount}

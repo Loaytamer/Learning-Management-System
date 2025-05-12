@@ -1,40 +1,55 @@
 import React, { createContext, useContext, useState } from 'react';
-import MOCK_NOTIFICATIONS, { Notification } from '../data/notifications';
-import { useAuth } from './AuthContext';
+import { Notification } from '../data/notifications';
 
 interface NotificationContextProps {
   notifications: Notification[];
   unreadCount: number;
-  markAsRead: (notificationId: string) => void;
+  addNotification: (
+    notification: Omit<Notification, 'id' | 'createdAt' | 'isRead' | 'userId'>
+  ) => void;
+  markAsRead: (id: string) => void;
   markAllAsRead: () => void;
-  deleteNotification: (notificationId: string) => void;
+  deleteNotification: (id: string) => void;
+  clearNotifications: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextProps>({
   notifications: [],
   unreadCount: 0,
+  addNotification: () => {},
   markAsRead: () => {},
   markAllAsRead: () => {},
   deleteNotification: () => {},
+  clearNotifications: () => {},
 });
 
 export const useNotifications = () => useContext(NotificationContext);
 
-export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // Filter notifications for the current user
-  const userNotifications = user 
-    ? notifications.filter(notification => notification.userId === user.id)
-    : [];
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  const unreadCount = userNotifications.filter(notification => !notification.isRead).length;
+  const addNotification = (
+    notification: Omit<Notification, 'id' | 'createdAt' | 'isRead' | 'userId'>
+  ) => {
+    const newNotification: Notification = {
+      ...notification,
+      id: Date.now().toString(),
+      createdAt: new Date(),
+      isRead: false,
+      userId: '1', // TODO: Get actual user ID from auth context
+    };
 
-  const markAsRead = (notificationId: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === notificationId
+    setNotifications((prev) => [newNotification, ...prev]);
+  };
+
+  const markAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((notification) =>
+        notification.id === id
           ? { ...notification, isRead: true }
           : notification
       )
@@ -42,29 +57,31 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const markAllAsRead = () => {
-    if (!user) return;
-
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.userId === user.id
-          ? { ...notification, isRead: true }
-          : notification
-      )
+    setNotifications((prev) =>
+      prev.map((notification) => ({ ...notification, isRead: true }))
     );
   };
 
-  const deleteNotification = (notificationId: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== notificationId));
+  const deleteNotification = (id: string) => {
+    setNotifications((prev) =>
+      prev.filter((notification) => notification.id !== id)
+    );
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
   };
 
   return (
     <NotificationContext.Provider
       value={{
-        notifications: userNotifications,
+        notifications,
         unreadCount,
+        addNotification,
         markAsRead,
         markAllAsRead,
         deleteNotification,
+        clearNotifications,
       }}
     >
       {children}

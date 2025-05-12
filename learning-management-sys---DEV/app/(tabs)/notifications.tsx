@@ -1,11 +1,23 @@
 import React from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+} from 'react-native';
 import { useNotifications } from '../../contexts/NotificationContext';
 import NotificationItem from '../../components/ui/NotificationItem';
 import { Bell, CheckCircle } from 'lucide-react-native';
 
 export default function NotificationsScreen() {
-  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+  } = useNotifications();
 
   const sortedNotifications = [...notifications].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -19,7 +31,7 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Notifications</Text>
-        
+
         {unreadCount > 0 && (
           <TouchableOpacity
             style={styles.markAllButton}
@@ -30,7 +42,7 @@ export default function NotificationsScreen() {
           </TouchableOpacity>
         )}
       </View>
-      
+
       <FlatList
         data={sortedNotifications}
         keyExtractor={(item) => item.id}

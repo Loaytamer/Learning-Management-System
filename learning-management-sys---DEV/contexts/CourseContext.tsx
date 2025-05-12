@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Course, Lesson } from '../data/courses';
 import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
 import * as courseAPI from '../api/courses';
+import { scheduleLocalNotification } from '../services/notifications';
 
 interface CourseProgress {
   courseId: string;
@@ -18,8 +20,21 @@ interface CourseContextProps {
   getCourse: (id: string) => Course | undefined;
   enrollInCourse: (courseId: string) => Promise<boolean>;
   unenrollFromCourse: (courseId: string) => Promise<boolean>;
-  createCourse: (course: Omit<Course, 'id' | 'instructor' | 'instructorName' | 'enrolledStudents' | 'createdAt' | 'updatedAt'>) => Promise<Course>;
-  updateCourse: (courseId: string, courseData: Partial<Course>) => Promise<boolean>;
+  createCourse: (
+    course: Omit<
+      Course,
+      | 'id'
+      | 'instructor'
+      | 'instructorName'
+      | 'enrolledStudents'
+      | 'createdAt'
+      | 'updatedAt'
+    >
+  ) => Promise<Course>;
+  updateCourse: (
+    courseId: string,
+    courseData: Partial<Course>
+  ) => Promise<boolean>;
   deleteCourse: (courseId: string) => Promise<boolean>;
   addLesson: (courseId: string, lesson: Omit<Lesson, 'id'>) => Promise<boolean>;
   markLessonComplete: (courseId: string, lessonId: string) => void;
@@ -34,7 +49,17 @@ const CourseContext = createContext<CourseContextProps>({
   getCourse: () => undefined,
   enrollInCourse: async (courseId: string) => false,
   unenrollFromCourse: async (courseId: string) => false,
-  createCourse: async (courseData: Omit<Course, 'id' | 'instructor' | 'instructorName' | 'enrolledStudents' | 'createdAt' | 'updatedAt'>) => ({} as Course),
+  createCourse: async (
+    courseData: Omit<
+      Course,
+      | 'id'
+      | 'instructor'
+      | 'instructorName'
+      | 'enrolledStudents'
+      | 'createdAt'
+      | 'updatedAt'
+    >
+  ) => ({} as Course),
   updateCourse: async (courseId: string, courseData: Partial<Course>) => false,
   deleteCourse: async (courseId: string) => false,
   addLesson: async (courseId: string, lessonData: Omit<Lesson, 'id'>) => false,
@@ -44,10 +69,15 @@ const CourseContext = createContext<CourseContextProps>({
 
 export const useCourses = () => useContext(CourseContext);
 
-export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { user, updateUser } = useAuth();
+  const { addNotification } = useNotifications();
   const [courses, setCourses] = useState<Course[]>([]);
-  const [courseProgress, setCourseProgress] = useState<Record<string, CourseProgress>>({});
+  const [courseProgress, setCourseProgress] = useState<
+    Record<string, CourseProgress>
+  >({});
 
   useEffect(() => {
     loadCourses();
@@ -57,24 +87,35 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const coursesData = await courseAPI.getAllCourses();
       setCourses(coursesData);
-      console.log('Courses loaded:', coursesData.map(c => c.id)); // Debug log
+      console.log(
+        'Courses loaded:',
+        coursesData.map((c) => c.id)
+      ); // Debug log
     } catch (error) {
       console.error('Failed to load courses:', error);
     }
   };
 
   // Filter courses for the current user
-  const enrolledCourses = user && user.id
-    ? courses.filter(course => course.enrolledStudents && course.enrolledStudents.includes(user.id))
-    : [];
+  const enrolledCourses =
+    user && user.id
+      ? courses.filter(
+          (course) =>
+            course.enrolledStudents && course.enrolledStudents.includes(user.id)
+        )
+      : [];
 
-  const instructorCourses = user?.role === 'instructor' && user.id
-    ? courses.filter(course => course.instructor && course.instructor.toString() === user.id)
-    : [];
+  const instructorCourses =
+    user?.role === 'instructor' && user.id
+      ? courses.filter(
+          (course) =>
+            course.instructor && course.instructor.toString() === user.id
+        )
+      : [];
 
   const getCourse = (id: string): Course | undefined => {
     if (!id) return undefined;
-    const course = courses.find(course => course && course.id === id);
+    const course = courses.find((course) => course && course.id === id);
     if (!course) console.warn(`Course with id ${id} not found in local state`);
     return course;
   };
@@ -94,7 +135,9 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       if (courseData.enrolledStudents?.includes(user.id)) {
-        console.warn(`User ${user.id} is already enrolled in course ${courseId}`);
+        console.warn(
+          `User ${user.id} is already enrolled in course ${courseId}`
+        );
         throw new Error('You are already enrolled in this course');
       }
 
@@ -114,7 +157,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       await loadCourses();
 
       // Initialize or update course progress
-      setCourseProgress(prev => ({
+      setCourseProgress((prev) => ({
         ...prev,
         [courseId]: {
           courseId,
@@ -124,11 +167,38 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         },
       }));
 
+      // Add in-app notification
+      addNotification({
+        title: 'Course Enrollment Successful',
+        message: `You have successfully enrolled in ${courseData.title}`,
+        type: 'course_update',
+      });
+
+      // Send local notification
+      await scheduleLocalNotification({
+        title: 'Course Enrollment Successful',
+        body: `You have successfully enrolled in ${courseData.title}. Start learning now!`,
+        data: {
+          courseId,
+          type: 'enrollment',
+        },
+      });
+
       console.log(`Successfully enrolled in course ${courseId}`);
       return true;
     } catch (error: any) {
       console.error('Failed to enroll in course:', error.message);
-      throw error instanceof Error ? error : new Error(error.message || 'Failed to enroll in course');
+
+      // Add error notification
+      addNotification({
+        title: 'Enrollment Failed',
+        message: error.message || 'Failed to enroll in course',
+        type: 'system',
+      });
+
+      throw error instanceof Error
+        ? error
+        : new Error(error.message || 'Failed to enroll in course');
     }
   };
 
@@ -152,7 +222,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Update user enrolledCourses in the database
       const updatedUserEnrolledCourses = user.enrolledCourses
-        ? user.enrolledCourses.filter(id => id !== courseId)
+        ? user.enrolledCourses.filter((id) => id !== courseId)
         : [];
       await updateUser({ enrolledCourses: updatedUserEnrolledCourses });
 
@@ -167,7 +237,17 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const createCourse = async (courseData: Omit<Course, 'id' | 'instructor' | 'instructorName' | 'enrolledStudents' | 'createdAt' | 'updatedAt'>): Promise<Course> => {
+  const createCourse = async (
+    courseData: Omit<
+      Course,
+      | 'id'
+      | 'instructor'
+      | 'instructorName'
+      | 'enrolledStudents'
+      | 'createdAt'
+      | 'updatedAt'
+    >
+  ): Promise<Course> => {
     if (!user || user.role !== 'instructor') {
       console.error('Only instructors can create courses');
       throw new Error('Only instructors can create courses');
@@ -191,7 +271,10 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const updateCourse = async (courseId: string, courseData: Partial<Course>): Promise<boolean> => {
+  const updateCourse = async (
+    courseId: string,
+    courseData: Partial<Course>
+  ): Promise<boolean> => {
     if (!user || user.role !== 'instructor') {
       console.error('Only instructors can update courses');
       return false;
@@ -200,7 +283,9 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const course = await courseAPI.getCourseById(courseId);
       if (!course || course.instructor !== user.id) {
-        console.error(`User ${user.id} not authorized to update course ${courseId}`);
+        console.error(
+          `User ${user.id} not authorized to update course ${courseId}`
+        );
         throw new Error('Not authorized to update this course');
       }
 
@@ -223,7 +308,9 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const course = await courseAPI.getCourseById(courseId);
       if (!course || course.instructor !== user.id) {
-        console.error(`User ${user.id} not authorized to delete course ${courseId}`);
+        console.error(
+          `User ${user.id} not authorized to delete course ${courseId}`
+        );
         throw new Error('Not authorized to delete this course');
       }
 
@@ -237,7 +324,10 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const addLesson = async (courseId: string, lessonData: Omit<Lesson, 'id'>): Promise<boolean> => {
+  const addLesson = async (
+    courseId: string,
+    lessonData: Omit<Lesson, 'id'>
+  ): Promise<boolean> => {
     if (!user || user.role !== 'instructor') {
       console.error('Only instructors can add lessons');
       return false;
@@ -246,7 +336,9 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const course = await courseAPI.getCourseById(courseId);
       if (!course || course.instructor !== user.id) {
-        console.error(`User ${user.id} not authorized to add lesson to course ${courseId}`);
+        console.error(
+          `User ${user.id} not authorized to add lesson to course ${courseId}`
+        );
         throw new Error('Not authorized to add lessons to this course');
       }
 
@@ -263,7 +355,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const markLessonComplete = (courseId: string, lessonId: string) => {
     if (!user) return;
 
-    setCourseProgress(prev => {
+    setCourseProgress((prev) => {
       const progress = prev[courseId] || {
         courseId,
         completedLessons: [],
