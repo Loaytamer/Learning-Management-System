@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  Platform,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useCourses } from '../../contexts/CourseContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,17 +19,25 @@ export default function CreateCourseScreen() {
   const router = useRouter();
   const { createCourse } = useCourses();
   const { user } = useAuth();
-  
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
-  const [level, setLevel] = useState<'Beginner' | 'Intermediate' | 'Advanced'>('Beginner');
+  const [level, setLevel] = useState<'Beginner' | 'Intermediate' | 'Advanced'>(
+    'Beginner'
+  );
   const [price, setPrice] = useState('');
-  const [thumbnail, setThumbnail] = useState('https://images.pexels.com/photos/4050315/pexels-photo-4050315.jpeg?auto=compress&cs=tinysrgb&w=600');
+  const [thumbnail, setThumbnail] = useState(
+    'https://images.pexels.com/photos/4050315/pexels-photo-4050315.jpeg?auto=compress&cs=tinysrgb&w=600'
+  );
   const [duration, setDuration] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const levels: Array<'Beginner' | 'Intermediate' | 'Advanced'> = ['Beginner', 'Intermediate', 'Advanced'];
+
+  const levels: Array<'Beginner' | 'Intermediate' | 'Advanced'> = [
+    'Beginner',
+    'Intermediate',
+    'Advanced',
+  ];
 
   if (!user || user.role !== 'instructor') {
     return (
@@ -35,7 +52,15 @@ export default function CreateCourseScreen() {
 
   const handleCreate = async () => {
     // Validate required fields
-    if (!title || !description || !category || !level || !thumbnail || !price || !duration) {
+    if (
+      !title ||
+      !description ||
+      !category ||
+      !level ||
+      !thumbnail ||
+      !price ||
+      !duration
+    ) {
       Alert.alert('Missing Fields', 'Please fill in all required fields');
       return;
     }
@@ -56,36 +81,50 @@ export default function CreateCourseScreen() {
         reviews: 0,
       };
 
+      console.log('Creating course with data:', courseData);
       const newCourse = await courseAPI.createCourse(courseData);
-      createCourse(courseData);
+      console.log('Course created:', newCourse);
 
-      setIsSubmitting(false);
-      Alert.alert(
-        'Course Created',
-        'Your course has been created successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset form
-              setTitle('');
-              setDescription('');
-              setCategory('');
-              setLevel('Beginner');
-              setPrice('');
-              setThumbnail('https://images.pexels.com/photos/4050315/pexels-photo-4050315.jpeg?auto=compress&cs=tinysrgb&w=600');
-              setDuration('');
-              
-              // Navigate to the course
-              router.push(`/course/${newCourse.id}`);
+      if (newCourse && newCourse.id) {
+        setIsSubmitting(false);
+
+        // Reset form
+        setTitle('');
+        setDescription('');
+        setCategory('');
+        setLevel('Beginner');
+        setPrice('');
+        setThumbnail(
+          'https://images.pexels.com/photos/4050315/pexels-photo-4050315.jpeg?auto=compress&cs=tinysrgb&w=600'
+        );
+        setDuration('');
+
+        Alert.alert(
+          'Course Created',
+          'Your course has been created successfully!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigate to the course details
+                router.push({
+                  pathname: '/course/[id]',
+                  params: { id: newCourse.id, refresh: 'true' },
+                });
+              },
             },
-          },
-        ]
-      );
-    } catch (error) {
+          ]
+        );
+      } else {
+        throw new Error('Failed to create course - no course ID returned');
+      }
+    } catch (error: any) {
       console.error('Error creating course:', error);
       setIsSubmitting(false);
-      Alert.alert('Error', 'Failed to create course');
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to create course. Please try again.'
+      );
     }
   };
 
@@ -95,7 +134,10 @@ export default function CreateCourseScreen() {
         <Text style={styles.title}>Create Course</Text>
       </View>
 
-      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.formContainer}>
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Course Title *</Text>
@@ -134,7 +176,7 @@ export default function CreateCourseScreen() {
                 onChangeText={setCategory}
               />
             </View>
-            
+
             <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
               <Text style={styles.label}>Level *</Text>
               <View style={styles.levelSelector}>
@@ -143,6 +185,7 @@ export default function CreateCourseScreen() {
                     key={lvl}
                     style={[
                       styles.levelButton,
+
                       level === lvl && styles.levelButtonActive,
                     ]}
                     onPress={() => setLevel(lvl)}
@@ -150,6 +193,7 @@ export default function CreateCourseScreen() {
                     <Text
                       style={[
                         styles.levelButtonText,
+                        lvl === 'Intermediate' && { fontSize: 9 },
                         level === lvl && styles.levelButtonTextActive,
                       ]}
                     >
@@ -173,7 +217,7 @@ export default function CreateCourseScreen() {
                 keyboardType="decimal-pad"
               />
             </View>
-            
+
             <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
               <Text style={styles.label}>Duration (hours) *</Text>
               <TextInput
@@ -213,7 +257,8 @@ export default function CreateCourseScreen() {
           </TouchableOpacity>
 
           <Text style={styles.noteText}>
-            * After creating your course, you'll be able to add lessons and content.
+            * After creating your course, you'll be able to add lessons and
+            content.
           </Text>
         </View>
       </ScrollView>
@@ -300,7 +345,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(98, 0, 238, 0.2)',
   },
   levelButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#9CA3AF',
     fontFamily: 'Inter-Regular',
   },

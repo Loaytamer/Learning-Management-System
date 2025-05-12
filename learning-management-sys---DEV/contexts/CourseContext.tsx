@@ -39,6 +39,7 @@ interface CourseContextProps {
   addLesson: (courseId: string, lesson: Omit<Lesson, 'id'>) => Promise<boolean>;
   markLessonComplete: (courseId: string, lessonId: string) => void;
   getProgress: (courseId: string) => number;
+  loadCourses: () => Promise<void>;
 }
 
 const CourseContext = createContext<CourseContextProps>({
@@ -65,6 +66,7 @@ const CourseContext = createContext<CourseContextProps>({
   addLesson: async (courseId: string, lessonData: Omit<Lesson, 'id'>) => false,
   markLessonComplete: () => {},
   getProgress: () => 0,
+  loadCourses: async () => {},
 });
 
 export const useCourses = () => useContext(CourseContext);
@@ -86,11 +88,16 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({
   const loadCourses = async () => {
     try {
       const coursesData = await courseAPI.getAllCourses();
-      setCourses(coursesData);
       console.log(
-        'Courses loaded:',
-        coursesData.map((c) => c.id)
-      ); // Debug log
+        'Loaded courses data:',
+        coursesData.map((course) => ({
+          id: course.id,
+          title: course.title,
+          instructor: course.instructor,
+          instructorName: course.instructorName,
+        }))
+      );
+      setCourses(coursesData);
     } catch (error) {
       console.error('Failed to load courses:', error);
     }
@@ -335,20 +342,61 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({
 
     try {
       const course = await courseAPI.getCourseById(courseId);
-      if (!course || course.instructor !== user.id) {
+      if (!course) {
+        console.error(`Course with id ${courseId} not found in database`);
+        throw new Error('Course not found');
+      }
+
+      // Fix the instructor check to handle both object and string formats
+      const isAuthorized =
+        (typeof course.instructor === 'object' &&
+          course.instructor._id === user.id) ||
+        (typeof course.instructor === 'string' &&
+          course.instructor === user.id);
+
+      if (!isAuthorized) {
         console.error(
           `User ${user.id} not authorized to add lesson to course ${courseId}`
         );
         throw new Error('Not authorized to add lessons to this course');
       }
 
-      const success = await courseAPI.addLesson(courseId, lessonData);
-      await loadCourses();
-      console.log(`Successfully added lesson to course ${courseId}`);
-      return success;
+      try {
+        console.log('Sending lesson data to API:', lessonData);
+        const success = await courseAPI.addLesson(courseId, lessonData);
+        if (success) {
+          // Refresh the courses to get the updated lesson list
+          console.log('Lesson added successfully, refreshing courses...');
+          await loadCourses();
+
+          // Double-check that the course was updated with the new lesson
+          const updatedCourse = await courseAPI.getCourseById(courseId);
+          if (updatedCourse) {
+            console.log(
+              `Updated course has ${updatedCourse.lessons?.length || 0} lessons`
+            );
+            // Force update the local courses array with the updated course
+            setCourses((prevCourses) => {
+              return prevCourses.map((c) => {
+                if (c.id === courseId) {
+                  return updatedCourse;
+                }
+                return c;
+              });
+            });
+          }
+
+          console.log(`Successfully added lesson to course ${courseId}`);
+          return true;
+        }
+        return false;
+      } catch (apiError: any) {
+        console.error('API Error adding lesson:', apiError);
+        throw apiError; // Propagate the specific API error
+      }
     } catch (error) {
       console.error('Failed to add lesson:', error);
-      return false;
+      throw error;
     }
   };
 
@@ -407,6 +455,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({
         addLesson,
         markLessonComplete,
         getProgress,
+        loadCourses,
       }}
     >
       {children}

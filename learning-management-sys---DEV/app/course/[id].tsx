@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -38,7 +38,7 @@ interface CourseProgress {
 }
 
 export default function CourseDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{ id: string; refresh?: string }>();
   const { user } = useAuth();
   const {
     getCourse,
@@ -48,13 +48,41 @@ export default function CourseDetailScreen() {
     addLesson,
     courseProgress,
     getProgress,
+    loadCourses,
   } = useCourses();
   const router = useRouter();
+
+  useEffect(() => {
+    if (id) {
+      loadCourses();
+    }
+  }, [id]);
 
   const course = getCourse(id);
   const isEnrolled = course && enrolledCourses.some((c) => c.id === course.id);
   const isInstructor = user && user.role === 'instructor';
-  const isOwner = isInstructor && course && course.instructor && user.id && course.instructor === user.id;
+
+  // Add console logs for debugging
+  console.log('Course:', course);
+  console.log('User:', user);
+  console.log('Course Instructor:', course?.instructor);
+  console.log('User ID:', user?.id);
+
+  // Fix the isOwner check to handle instructor object
+  const isOwner =
+    isInstructor &&
+    course &&
+    ((typeof course.instructor === 'object' &&
+      course.instructor._id === user?.id) ||
+      (typeof course.instructor === 'string' &&
+        course.instructor === user?.id));
+
+  console.log('Is Owner:', isOwner);
+  console.log('Is Instructor:', isInstructor);
+  console.log('Is Enrolled:', isEnrolled);
+
+  const showEnrollButton = !isEnrolled && !isOwner;
+  const showAddLessonButton = isOwner;
 
   const [isAddLessonModalVisible, setIsAddLessonModalVisible] = useState(false);
   const [newLessonTitle, setNewLessonTitle] = useState('');
@@ -96,7 +124,7 @@ export default function CourseDetailScreen() {
               {
                 text: 'View Course',
                 style: 'default',
-              }
+              },
             ]
           );
         }
@@ -120,10 +148,11 @@ export default function CourseDetailScreen() {
       };
       const lastLessonId = progress.lastAccessedLessonId;
       const firstUncompletedLesson = course.lessons.find(
-        lesson => !progress.completedLessons.includes(lesson.id)
+        (lesson) => !progress.completedLessons.includes(lesson.id)
       );
-      
-      const targetLessonId = lastLessonId || (firstUncompletedLesson?.id || course.lessons[0].id);
+
+      const targetLessonId =
+        lastLessonId || firstUncompletedLesson?.id || course.lessons[0].id;
       router.push(`/lesson/${targetLessonId}`);
     } else {
       Alert.alert('No Lessons', 'This course has no lessons available yet.');
@@ -135,8 +164,7 @@ export default function CourseDetailScreen() {
   };
 
   const handleAddLesson = () => {
-    if (!isOwner) return;
-    setIsAddLessonModalVisible(true);
+    router.push(`/course/${id}/add-lesson`);
   };
 
   const submitNewLesson = async () => {
@@ -225,11 +253,11 @@ export default function CourseDetailScreen() {
             <View style={styles.progressSection}>
               <Text style={styles.sectionTitle}>Your Progress</Text>
               <View style={styles.progressBar}>
-                <View 
+                <View
                   style={[
-                    styles.progressFill, 
-                    { width: `${getProgress(course.id)}%` }
-                  ]} 
+                    styles.progressFill,
+                    { width: `${getProgress(course.id)}%` },
+                  ]}
                 />
               </View>
               <Text style={styles.progressText}>
@@ -250,7 +278,7 @@ export default function CourseDetailScreen() {
             <Text style={styles.contentStats}>
               {course.lessons.length} lessons • {course.duration} total hours
             </Text>
-            
+
             {course.lessons.map((lesson, index) => {
               const progress = courseProgress[course.id] || {
                 courseId: course.id,
@@ -259,10 +287,17 @@ export default function CourseDetailScreen() {
                 quizScores: {},
               };
               const isCompleted = progress.completedLessons.includes(lesson.id);
-              const isCurrentLesson = progress.lastAccessedLessonId === lesson.id;
-              const previousLessonCompleted = index === 0 || 
-                (course.lessons[index - 1] && progress.completedLessons.includes(course.lessons[index - 1].id));
-              const isLocked = !isEnrolled || (!isCompleted && !previousLessonCompleted && index !== 0);
+              const isCurrentLesson =
+                progress.lastAccessedLessonId === lesson.id;
+              const previousLessonCompleted =
+                index === 0 ||
+                (course.lessons[index - 1] &&
+                  progress.completedLessons.includes(
+                    course.lessons[index - 1].id
+                  ));
+              const isLocked =
+                !isEnrolled ||
+                (!isCompleted && !previousLessonCompleted && index !== 0);
 
               return (
                 <LessonCard
@@ -272,7 +307,9 @@ export default function CourseDetailScreen() {
                   isCompleted={isCompleted}
                   isCurrentLesson={isCurrentLesson}
                   isLocked={isLocked}
-                  onPress={() => isEnrolled ? handleLessonPress(lesson) : handleEnroll()}
+                  onPress={() =>
+                    isEnrolled ? handleLessonPress(lesson) : handleEnroll()
+                  }
                 />
               );
             })}
@@ -287,18 +324,33 @@ export default function CourseDetailScreen() {
               >
                 <Play size={20} color="#FFFFFF" />
                 <Text style={styles.buttonText}>
-                  {courseProgress[course.id]?.lastAccessedLessonId ? 'Continue Learning' : 'Start Learning'}
+                  {courseProgress[course.id]?.lastAccessedLessonId
+                    ? 'Continue Learning'
+                    : 'Start Learning'}
                 </Text>
               </TouchableOpacity>
-            ) : (
+            ) : showEnrollButton ? (
               <TouchableOpacity
                 style={styles.primaryButton}
                 onPress={handleEnroll}
               >
-                <Text style={styles.buttonText}>Enroll Now - {course.price ? `$${course.price.toFixed(2)}` : 'Free'}</Text>
+                <Text style={styles.buttonText}>
+                  Enroll Now -{' '}
+                  {course.price ? `$${course.price.toFixed(2)}` : 'Free'}
+                </Text>
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
+
+          {showAddLessonButton && (
+            <TouchableOpacity
+              style={styles.addLessonButton}
+              onPress={handleAddLesson}
+            >
+              <Plus size={20} color="#FFFFFF" />
+              <Text style={styles.addLessonButtonText}>Add Lesson</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
@@ -535,18 +587,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   addLessonButton: {
+    backgroundColor: '#6200EE',
+    borderRadius: 8,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4B5563',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    justifyContent: 'center',
+    marginHorizontal: 16,
+    marginVertical: 16,
   },
-  addLessonText: {
-    fontSize: 14,
+  addLessonButtonText: {
     color: '#FFFFFF',
-    marginLeft: 6,
-    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+    fontFamily: 'Inter-SemiBold',
   },
   emptyLessons: {
     backgroundColor: '#1F2937',

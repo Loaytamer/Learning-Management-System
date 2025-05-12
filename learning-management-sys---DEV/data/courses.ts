@@ -28,13 +28,18 @@ export interface Question {
   correctAnswer: number;
 }
 
+interface Instructor {
+  _id: string;
+  username: string;
+}
+
 export interface Course {
   _id?: string;
   id: string;
   title: string;
   description: string;
   thumbnail: string;
-  instructor: string; // instructor id
+  instructor: string | Instructor;
   instructorName: string;
   category: string;
   level: 'Beginner' | 'Intermediate' | 'Advanced';

@@ -183,7 +183,7 @@ export default function HomeScreen() {
             </Text>
             <TouchableOpacity
               style={styles.browseButton}
-              onPress={() => router.push('/courses')}
+              onPress={() => {isInstructor ? router.push('/create') : router.push('/courses')}}
             >
               <Text style={styles.browseButtonText}>
                 {isInstructor ? 'Create Course' : 'Browse Courses'}
