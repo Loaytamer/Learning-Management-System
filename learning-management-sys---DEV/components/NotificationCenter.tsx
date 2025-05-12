@@ -33,6 +33,21 @@ export const NotificationCenter: React.FC = () => {
 
   const latestNotification = notifications[0];
 
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case 'announcement':
+        return '#F59E0B'; // Yellow
+      case 'course_update':
+        return '#3B82F6'; // Blue
+      case 'reminder':
+        return '#EF4444'; // Red
+      case 'system':
+        return '#10B981'; // Green
+      default:
+        return '#2196F3'; // Default blue
+    }
+  };
+
   return (
     <Animated.View
       style={[
@@ -54,12 +69,7 @@ export const NotificationCenter: React.FC = () => {
         style={[
           styles.notification,
           {
-            backgroundColor:
-              latestNotification.type === 'success'
-                ? '#4CAF50'
-                : latestNotification.type === 'error'
-                ? '#F44336'
-                : '#2196F3',
+            backgroundColor: getNotificationColor(latestNotification.type),
           },
         ]}
         onPress={() => markAsRead(latestNotification.id)}
