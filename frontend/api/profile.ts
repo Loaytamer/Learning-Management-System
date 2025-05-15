@@ -2,7 +2,8 @@ import axios from 'axios';
 import { getAuthToken } from './auth';
 
 // const API_URL = 'http://192.168.8.115:5000/api/auth';
-const API_URL = 'http://192.168.1.6:5000/api/auth'; // Loay
+// const API_URL = 'http://192.168.1.6:5000/api/auth'; // Loay
+const API_URL = 'http://192.168.43.250:5000/api/auth'; // Loay
 
 /**
  * Upload profile image to the server

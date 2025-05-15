@@ -3,7 +3,8 @@ import { Lesson } from '../data/courses';
 import { getAuthToken } from './auth';
 
 const API_URL =
-  process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.6:5000/api';
+  // process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.6:5000/api';
+  process.env.EXPO_PUBLIC_API_URL || 'http://192.168.43.250:5000/api';
 
 // Validate URL to prevent empty URI issues
 if (!API_URL) {

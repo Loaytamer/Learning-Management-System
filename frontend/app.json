@@ -20,10 +20,19 @@
       "expo-router",
       "expo-font",
       "expo-web-browser"
-      
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0cc4aee6-3637-4005-a07e-0f686b72950d"
+      }
+    },
+    "owner": "loaytamer10",
+    "android": {
+      "package": "com.loaytamer10.boltexponativewind"
     }
   }
 }

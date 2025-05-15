@@ -1,11 +1,23 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Eye, EyeOff, UserPlus } from 'lucide-react-native';
+import { useAuth } from '../../contexts/AuthContext'; // Import useAuth
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { register } = useAuth(); // Get register function from AuthContext
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,6 +29,7 @@ export default function SignupScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSignup = async () => {
+    // Validate inputs
     if (!name || !email || !password || !confirmPassword) {
       setError('Please fill in all fields.');
       return;
@@ -31,15 +44,16 @@ export default function SignupScreen() {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, this would create a new user
-      // For this demo, we'll just redirect to login
-      router.replace('/login');
-    } catch (err) {
-      setError('An error occurred. Please try again.');
-      console.error(err);
+      const success = await register(name, email, password, role);
+      if (success) {
+        // Redirect to home or dashboard after successful signup
+        router.replace('/'); // Adjust to your app's home route
+      } else {
+        setError('Registration failed. Please try again.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred. Please try again.');
+      console.error('Signup error:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -63,7 +77,9 @@ export default function SignupScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Image
-            source={{ uri: 'https://images.pexels.com/photos/5904974/pexels-photo-5904974.jpeg?auto=compress&cs=tinysrgb&w=600' }}
+            source={{
+              uri: 'https://images.pexels.com/photos/5904974/pexels-photo-5904974.jpeg?auto=compress&cs=tinysrgb&w=600',
+            }}
             style={styles.logo}
           />
           <Text style={styles.title}>EduLearn</Text>
@@ -72,9 +88,9 @@ export default function SignupScreen() {
 
         <View style={styles.formContainer}>
           <Text style={styles.formTitle}>Sign Up</Text>
-          
+
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          
+
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Full Name</Text>
             <TextInput
@@ -204,12 +220,6 @@ export default function SignupScreen() {
               </TouchableOpacity>
             </Link>
           </View>
-          
-          {/* <View style={styles.demoNote}>
-            <Text style={styles.demoNoteText}>
-              Note: Registration is mocked for demo purposes. Please use the pre-defined credentials on the login screen.
-            </Text>
-          </View> */}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -360,18 +370,5 @@ const styles = StyleSheet.create({
     color: '#6200EE',
     fontSize: 14,
     fontFamily: 'Inter-Medium',
-  },
-  demoNote: {
-    marginTop: 24,
-    padding: 16,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#F59E0B',
-  },
-  demoNoteText: {
-    color: '#F9FAFB',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
   },
 });

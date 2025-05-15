@@ -18,6 +18,12 @@ interface AuthContextProps {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  register: (
+    username: string,
+    email: string,
+    password: string,
+    role: 'student' | 'instructor'
+  ) => Promise<boolean>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -27,6 +33,7 @@ const AuthContext = createContext<AuthContextProps>({
   isAuthenticated: false,
   isLoading: true,
   login: async () => false,
+  register: async () => false,
   logout: () => {},
   updateUser: () => {},
 });
@@ -38,7 +45,9 @@ const transformAvatar = (avatar?: string): { uri: string } | undefined => {
   return avatar ? { uri: avatar } : undefined;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -51,12 +60,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           AsyncStorage.getItem('token'),
         ]);
 
-        console.log("Startup - Stored user:", storedUser, "Token:", token); // Debug log
+        console.log('Startup - Stored user:', storedUser, 'Token:', token); // Debug log
 
         if (storedUser && token) {
           const userData = JSON.parse(storedUser) as User;
           setUser(userData); // Use the stored user data (including avatar) directly
-          console.log("Startup - Loaded user with avatar from storage:", userData.avatar);
+          console.log(
+            'Startup - Loaded user with avatar from storage:',
+            userData.avatar
+          );
 
           // Optionally sync with backend to ensure token is still valid
           try {
@@ -68,19 +80,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 email: updatedUser.email,
                 role: updatedUser.role,
                 avatar: transformAvatar(updatedUser.avatar) ?? userData.avatar, // Prefer stored avatar if API doesn't return one
-                enrolledCourses: updatedUser.enrolledCourses || userData.enrolledCourses,
-                createdCourses: updatedUser.createdCourses || userData.createdCourses,
+                enrolledCourses:
+                  updatedUser.enrolledCourses || userData.enrolledCourses,
+                createdCourses:
+                  updatedUser.createdCourses || userData.createdCourses,
               };
-              console.log("Startup - Synced user with avatar from API:", fullUserData.avatar);
+              console.log(
+                'Startup - Synced user with avatar from API:',
+                fullUserData.avatar
+              );
               setUser(fullUserData);
               await AsyncStorage.setItem('user', JSON.stringify(fullUserData));
             }
           } catch (apiError) {
-            console.error("Startup - Failed to sync with API, using stored data:", apiError);
+            console.error(
+              'Startup - Failed to sync with API, using stored data:',
+              apiError
+            );
             // Continue using stored user data if API sync fails
           }
         } else {
-          console.log("Startup - No stored user or token");
+          console.log('Startup - No stored user or token');
         }
       } catch (error) {
         console.error('Error retrieving stored user:', error);
@@ -101,13 +121,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await authApi.login({ email, password });
 
-      console.log("Login - API response (login):", response); // Debug log
+      console.log('Login - API response (login):', response); // Debug log
 
       if (response && response.success) {
         const { user: userData, token } = response;
         if (userData && token) {
           const updatedUser = await authApi.getCurrentUser(token);
-          console.log("Login - API response (getCurrentUser):", updatedUser); // Debug log
+          console.log('Login - API response (getCurrentUser):', updatedUser); // Debug log
 
           const avatarFromLogin = transformAvatar(userData.avatar);
           const avatarFromGetCurrentUser = transformAvatar(updatedUser.avatar);
@@ -118,10 +138,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email: userData.email,
             role: userData.role as 'student' | 'instructor',
             avatar: avatarFromGetCurrentUser || avatarFromLogin, // Prioritize getCurrentUser, fallback to login response
-            enrolledCourses: updatedUser.enrolledCourses || userData.enrolledCourses || [],
-            createdCourses: updatedUser.createdCourses || userData.createdCourses || [],
+            enrolledCourses:
+              updatedUser.enrolledCourses || userData.enrolledCourses || [],
+            createdCourses:
+              updatedUser.createdCourses || userData.createdCourses || [],
           };
-          console.log("Login - Setting user with avatar:", fullUserData.avatar); // Debug log
+          console.log('Login - Setting user with avatar:', fullUserData.avatar); // Debug log
           setUser(fullUserData);
           await Promise.all([
             AsyncStorage.setItem('user', JSON.stringify(fullUserData)),
@@ -138,8 +160,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const register = async (
+    username: string,
+    email: string,
+    password: string,
+    role: 'student' | 'instructor'
+  ): Promise<boolean> => {
+    try {
+      const response = await authApi.register({
+        username,
+        email,
+        password,
+        role,
+      });
+
+      console.log('Register - API response (register):', response); // Debug log
+
+      if (response && response.success) {
+        const { user: userData, token } = response;
+        if (userData && token) {
+          const updatedUser = await authApi.getCurrentUser(token);
+          console.log('Register - API response (getCurrentUser):', updatedUser); // Debug log
+
+          const avatarFromRegister = transformAvatar(userData.avatar);
+          const avatarFromGetCurrentUser = transformAvatar(updatedUser.avatar);
+
+          const fullUserData: User = {
+            id: userData.id,
+            username: userData.username,
+            email: userData.email,
+            role: userData.role as 'student' | 'instructor',
+            avatar: avatarFromGetCurrentUser || avatarFromRegister, // Prioritize getCurrentUser, fallback to register response
+            enrolledCourses:
+              updatedUser.enrolledCourses || userData.enrolledCourses || [],
+            createdCourses:
+              updatedUser.createdCourses || userData.createdCourses || [],
+          };
+          console.log(
+            'Register - Setting user with avatar:',
+            fullUserData.avatar
+          ); // Debug log
+          setUser(fullUserData);
+          await Promise.all([
+            AsyncStorage.setItem('user', JSON.stringify(fullUserData)),
+            AsyncStorage.setItem('token', token),
+          ]);
+          return true;
+        }
+      }
+      return false;
+    } catch (error: any) {
+      const errorMessage = error.message || 'An unexpected error occurred';
+      console.error('Register error:', errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
   const logout = async () => {
-    console.log("Logout - Clearing user and token"); // Debug log
+    console.log('Logout - Clearing user and token'); // Debug log
     setUser(null);
     await Promise.all([
       AsyncStorage.removeItem('user'),
@@ -151,7 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUser = async (userData: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...userData };
-      console.log("UpdateUser - Updated user with avatar:", updatedUser.avatar); // Debug log
+      console.log('UpdateUser - Updated user with avatar:', updatedUser.avatar); // Debug log
       setUser(updatedUser);
       await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
     }
@@ -164,6 +242,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         isLoading,
         login,
+        register,
         logout,
         updateUser,
       }}

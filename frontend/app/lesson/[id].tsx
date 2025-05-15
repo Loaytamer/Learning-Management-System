@@ -22,7 +22,22 @@ import VideoPlayer from '../../components/ui/VideoPlayer';
 import ProgressBar from '../../components/ui/ProgressBar';
 
 export default function LessonScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{
+    id: string;
+    courseId?: string;
+  }>();
+
+  const id = params?.id;
+  const courseId = params?.courseId;
+
+  // Validate required parameters
+  useEffect(() => {
+    if (!id) {
+      console.error('Lesson ID is required');
+      router.replace('/courses');
+      return;
+    }
+  }, [id]);
   const router = useRouter();
   const { user } = useAuth();
   const { courses, enrolledCourses, markLessonComplete, getProgress } =
@@ -34,58 +49,75 @@ export default function LessonScreen() {
 
   // Find the lesson and its parent course
   useEffect(() => {
+    if (!id) return; // Skip if no lesson ID is provided
+
     let foundLesson: Lesson | null = null;
     let foundCourse: Course | null = null;
     let foundIndex: number = 0;
 
-    // Debug logging
-    console.log('Looking for lesson with ID:', id);
-    console.log(
-      'Available courses:',
-      courses.map((c) => c.title)
-    );
-
-    for (const course of courses) {
+    const findLessonInCourse = (
+      course: Course
+    ): { lesson: Lesson | null; index: number } => {
       if (!course.lessons || !Array.isArray(course.lessons)) {
-        console.log(`Course ${course.title} has no lessons array`);
-        continue;
+        return { lesson: null, index: -1 };
       }
 
-      console.log(
-        `Checking course ${course.title} with ${course.lessons.length} lessons`
-      );
-
-      // Try to find by exact match first
-      const index = course.lessons.findIndex((lesson) => lesson.id === id);
-      if (index !== -1) {
-        foundLesson = course.lessons[index];
-        foundCourse = course;
-        foundIndex = index;
-        console.log('Found lesson by exact ID match:', foundLesson.title);
-        break;
-      }
-
-      // If not found, try with string comparison (in case of type mismatch)
-      const indexByString = course.lessons.findIndex(
+      const index = course.lessons.findIndex(
         (lesson) => String(lesson.id) === String(id)
       );
-      if (indexByString !== -1) {
-        foundLesson = course.lessons[indexByString];
-        foundCourse = course;
-        foundIndex = indexByString;
-        console.log('Found lesson by string ID comparison:', foundLesson.title);
-        break;
+
+      return {
+        lesson: index !== -1 ? course.lessons[index] : null,
+        index: index,
+      };
+    };
+
+    try {
+      // If courseId is provided, first try to find the course by that ID
+      if (courseId) {
+        const specificCourse = courses.find(
+          (course) => String(course.id) === String(courseId)
+        );
+
+        if (specificCourse) {
+          const { lesson, index } = findLessonInCourse(specificCourse);
+          if (lesson) {
+            foundLesson = lesson;
+            foundCourse = specificCourse;
+            foundIndex = index;
+          }
+        }
       }
-    }
 
-    if (!foundLesson) {
-      console.log('No lesson found with ID:', id);
-    }
+      // If we haven't found the lesson yet, search through all courses
+      if (!foundLesson) {
+        for (const course of courses) {
+          const { lesson, index } = findLessonInCourse(course);
+          if (lesson) {
+            foundLesson = lesson;
+            foundCourse = course;
+            foundIndex = index;
+            break;
+          }
+        }
+      }
 
-    setCurrentLesson(foundLesson);
-    setParentCourse(foundCourse);
-    setLessonIndex(foundIndex);
-  }, [id, courses]);
+      if (!foundLesson || !foundCourse) {
+        console.error('Lesson not found:', {
+          lessonId: id,
+          courseId: courseId,
+          availableCourses: courses.map((c) => ({ id: c.id, title: c.title })),
+        });
+      }
+
+      setCurrentLesson(foundLesson);
+      setParentCourse(foundCourse);
+      setLessonIndex(foundIndex);
+    } catch (error) {
+      console.error('Error finding lesson:', error);
+      router.replace('/courses');
+    }
+  }, [id, courseId, courses]);
 
   if (!currentLesson || !parentCourse) {
     return (
@@ -115,18 +147,33 @@ export default function LessonScreen() {
 
   const navigateToNextLesson = () => {
     if (lessonIndex < parentCourse.lessons.length - 1) {
-      const nextLessonId = parentCourse.lessons[lessonIndex + 1].id;
-      router.replace(`/lesson/${nextLessonId}`);
+      // Get the next lesson based on array index
+      const nextLesson = parentCourse.lessons[lessonIndex + 1];
+      if (nextLesson) {
+        router.replace({
+          pathname: '/lesson/[id]',
+          params: { id: nextLesson.id, courseId: parentCourse.id },
+        });
+      }
     } else {
-      // This is the last lesson
-      router.replace(`/course/${parentCourse.id}`);
+      // This is the last lesson, return to course page
+      router.replace({
+        pathname: '/course/[id]',
+        params: { id: parentCourse.id },
+      });
     }
   };
 
   const navigateToPreviousLesson = () => {
     if (lessonIndex > 0) {
-      const prevLessonId = parentCourse.lessons[lessonIndex - 1].id;
-      router.replace(`/lesson/${prevLessonId}`);
+      // Get the previous lesson based on array index
+      const prevLesson = parentCourse.lessons[lessonIndex - 1];
+      if (prevLesson) {
+        router.replace({
+          pathname: '/lesson/[id]',
+          params: { id: prevLesson.id, courseId: parentCourse.id },
+        });
+      }
     }
   };
 
@@ -137,7 +184,12 @@ export default function LessonScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButtonContainer}
-          onPress={() => router.push(`/course/${parentCourse.id}`)}
+          onPress={() =>
+            router.push({
+              pathname: '/course/[id]',
+              params: { id: parentCourse.id },
+            })
+          }
         >
           <ArrowLeft size={20} color="#FFFFFF" />
         </TouchableOpacity>
@@ -174,7 +226,12 @@ export default function LessonScreen() {
             </Text>
             <TouchableOpacity
               style={styles.enrollButton}
-              onPress={() => router.push(`/course/${parentCourse.id}`)}
+              onPress={() =>
+                router.push({
+                  pathname: '/course/[id]',
+                  params: { id: parentCourse.id },
+                })
+              }
             >
               <Text style={styles.enrollButtonText}>Go to Course</Text>
             </TouchableOpacity>
@@ -230,7 +287,12 @@ export default function LessonScreen() {
             ) : (
               <TouchableOpacity
                 style={[styles.navButton, styles.completeButton]}
-                onPress={() => router.push(`/course/${parentCourse.id}`)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/course/[id]',
+                    params: { id: parentCourse.id },
+                  })
+                }
               >
                 <CheckCircle size={16} color="#FFFFFF" />
                 <Text style={styles.completeButtonText}>Complete Course</Text>
