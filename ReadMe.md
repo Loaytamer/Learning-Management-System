@@ -149,6 +149,5 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 [![GitHub stars](https://img.shields.io/github/stars/Loaytamer/Learning-Management-System?style=social)](https://github.com/Loaytamer/Learning-Management-System)
 [![GitHub forks](https://img.shields.io/github/forks/Loaytamer/Learning-Management-System?style=social)](https://github.com/Loaytamer/Learning-Management-System)
 
-Made with ❤️ by the LMS Team
 
 </div>
